@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campanhas com Pagamento Atrasados</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans min-h-screen">
+
+    <div class="flex flex-col md:flex-row min-h-screen">
+        
+        <aside class="w-full md:w-64 bg-slate-800 p-6 border-r border-slate-700 space-y-6">
+            <div class="flex items-center gap-3 mb-4">
+                <i class="fa-solid fa-chart-pie text-emerald-400 text-2xl"></i>
+                <h1 class="text-xl font-bold tracking-wider">CAMPANHAS</h1>
+            </div>
+            
+            <hr class="border-slate-700">
+
+            <div class="space-y-2">
+                <label class="block text-xs font-semibold text-slate-400 uppercase tracking-wider">Base de Dados</label>
+                <button onclick="document.getElementById('inputArquivoCsv').click()" class="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2 px-3 rounded transition flex items-center justify-center gap-2 cursor-pointer shadow-sm">
+                    <i class="fa-solid fa-file-import"></i> Subir Nova Base (CSV)
+                </button>
+                <input type="file" id="inputArquivoCsv" accept=".csv" class="hidden" onchange="importarNovaBase(this)">
+            </div>
+
+            <hr class="border-slate-700">
+
+            <div class="space-y-4">
+                <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Filtros Avançados</h3>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-slate-300">Comprador</label>
+                    <select id="filterComprador" onchange="atualizarDashboard()" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500">
+                        <option value="Todos">Todos os Compradores</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-slate-300">Tipo de Campanha</label>
+                    <select id="filterTipo" onchange="atualizarDashboard()" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500">
+                        <option value="Todos">Todos os Tipos</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-slate-300">Mês</label>
+                    <select id="filterMes" onchange="atualizarDashboard()" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500">
+                        <option value="Todos">Todos os Meses</option>
+                    </select>
+                </div>
+            </div>
+        </aside>
+
+        <main class="flex-1 p-6 md:p-8 space-y-6 overflow-y-auto">
+            
+            <header class="flex justify-between items-center border-b border-slate-800 pb-4">
+                <div>
+                    <h2 class="text-2xl font-bold">Campanhas com Pagamento Atrasados</h2>
+                    <p class="text-slate-400 text-sm">Análise em tempo real baseado nos dados consolidados</p>
+                </div>
+                <div class="bg-slate-800 px-4 py-2 rounded border border-slate-700 text-xs font-mono" style="color: #ff3333; font-weight: bold; text-transform: uppercase;">
+                    SITUAÇÃO: CAMPANHAS EM ATRASO
+                </div>
+            </header>
+
+            <section class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 flex items-center justify-between shadow-lg">
+                    <div>
+                        <p class="text-slate-400 text-xs font-semibold uppercase">TOTAL VALOR DEVEDOR</p>
+                        <h3 id="kpiTotalInvestido" class="text-2xl font-bold text-emerald-400 mt-1">R$ 0,00</h3>
+                    </div>
+                    <i class="fa-solid fa-money-bill-wave text-slate-600 text-3xl"></i>
+                </div>
+
+                <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 flex items-center justify-between shadow-lg">
+                    <div>
+                        <p class="text-slate-400 text-xs font-semibold uppercase">Qtd de Campanhas</p>
+                        <h3 id="kpiTotalCampanhas" class="text-2xl font-bold text-blue-400 mt-1">0</h3>
+                    </div>
+                    <i class="fa-solid fa-bullhorn text-slate-600 text-3xl"></i>
+                </div>
+
+                <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 flex items-center justify-between shadow-lg">
+                    <div>
+                        <p class="text-slate-400 text-xs font-semibold uppercase">Média Dias em Atraso</p>
+                        <h3 id="kpiMediaAtraso" class="text-2xl font-bold text-amber-500 mt-1">0 dias</h3>
+                    </div>
+                    <i class="fa-solid fa-clock-history text-slate-600 text-3xl"></i>
+                </div>
+
+                <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 flex items-center justify-between shadow-lg">
+                    <div>
+                        <p class="text-slate-400 text-xs font-semibold uppercase">MAIOR DÉBITO</p>
+                        <h3 id="kpiMaiorInvestimento" class="text-2xl font-bold text-purple-400 mt-1">R$ 0,00</h3>
+                    </div>
+                    <i class="fa-solid fa-ranking-star text-slate-600 text-3xl"></i>
+                </div>
+            </section>
+
+            <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg">
+                    <h4 class="text-md font-bold mb-4 text-slate-300 flex items-center gap-2">
+                        <i class="fa-solid fa-user-tie text-blue-400"></i> Campanhas por Comprador
+                    </h4>
+                    <div class="relative h-64 flex justify-center">
+                        <canvas id="chartCompradores"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg">
+                    <h4 class="text-md font-bold mb-4 text-slate-300 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-bar text-emerald-400"></i> Investimento por Mês (R$)
+                    </h4>
+                    <div class="relative h-64">
+                        <canvas id="chartMeses"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <section class="bg-slate-800 rounded-xl border border-slate-700 shadow-lg overflow-hidden">
+                <div class="p-5 border-b border-slate-700 flex justify-between items-center">
+                    <h4 class="text-md font-bold text-slate-300 flex items-center gap-2">
+                        <i class="fa-solid fa-list text-purple-400"></i> Listagem Detalhada
+                    </h4>
+                    <div class="flex items-center gap-3">
+                        <span id="txtContadorLinhas" class="text-xs text-slate-400">Mostrando 0 registros</span>
+                    </div>
+                </div>
+                <div class="overflow-x-auto max-h-96">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead class="bg-slate-900 text-slate-400 sticky top-0 uppercase text-xs tracking-wider">
+                            <tr>
+                                <th class="p-4 border-b border-slate-700 cursor-pointer hover:text-white transition-colors" onclick="ordenarTabela('campanha')">Nome da Campanha <i class="fa-solid fa-sort ml-1 opacity-50"></i></th>
+                                <th class="p-4 border-b border-slate-700 cursor-pointer hover:text-white transition-colors" onclick="ordenarTabela('fornecedor')">Fornecedor <i class="fa-solid fa-sort ml-1 opacity-50"></i></th>
+                                <th class="p-4 border-b border-slate-700 cursor-pointer hover:text-white transition-colors" onclick="ordenarTabela('comprador')">Comprador <i class="fa-solid fa-sort ml-1 opacity-50"></i></th>
+                                <th class="p-4 border-b border-slate-700 cursor-pointer hover:text-white transition-colors" onclick="ordenarTabela('tipo')">Tipo <i class="fa-solid fa-sort ml-1 opacity-50"></i></th>
+                                <th class="p-4 border-b border-slate-700 text-right cursor-pointer hover:text-white transition-colors" onclick="ordenarTabela('investimento')">Investimento <i class="fa-solid fa-sort ml-1 opacity-50"></i></th>
+                                <th class="p-4 border-b border-slate-700 cursor-pointer hover:text-white transition-colors" onclick="ordenarTabela('mes')">Mês <i class="fa-solid fa-sort ml-1 opacity-50"></i></th>
+                                <th class="p-4 border-b border-slate-700 text-right cursor-pointer hover:text-white transition-colors" onclick="ordenarTabela('atraso')">Atraso (Dias) <i class="fa-solid fa-sort ml-1 opacity-50"></i></th>
+                            </tr>
+                        </thead>
+                        <tbody id="corpoTabela" class="divide-y divide-slate-700 text-slate-300">
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <script>
+        // Transcrição padrão inicial do dashboard
+        let dadosBrutos = [
+            { campanha: "URBA0126", fornecedor: "URBA", comprador: "BRUNO", tipo: "PERIÓDICA", investimento: 7201.00, mes: "01. janeiro", atraso: 97 },
+            { campanha: "PROMETEON0226", fornecedor: "PROMETEON", comprador: "RICARDO", tipo: "PERIÓDICA", investimento: 500.00, mes: "02. fevereiro", atraso: 46 },
+            { campanha: "SEXTA-FOCO MONROE - 27.02", fornecedor: "MONROE", comprador: "HUMBERTO", tipo: "DIA FOCO", investimento: 2600.00, mes: "02. fevereiro", atraso: 120 },
+            { campanha: "MAHLETÉRMICAS0226", fornecedor: "MAHLE", comprador: "CINTHIA", tipo: "PERIÓDICA", investimento: 6725.00, mes: "02. fevereiro", atraso: 34 },
+            { campanha: "MONROE0226 - VENDEU, GANHOU!", fornecedor: "MONROE", comprador: "HUMBERTO", tipo: "PERIÓDICA", investimento: 68100.00, mes: "03. março", atraso: 35 },
+            { campanha: "SEXTA-FOCO URBA 06.03", fornecedor: "URBA", comprador: "BRUNO", tipo: "DIA FOCO", investimento: 2600.00, mes: "03. março", atraso: 113 },
+            { campanha: "QUARTA-FOCO VDO -25.03", fornecedor: "VDO", comprador: "VINICIUS", tipo: "DIA FOCO", investimento: 2600.00, mes: "03. março", atraso: 95 },
+            { campanha: "DYNA0326", fornecedor: "DYNA", comprador: "RICARDO", tipo: "PERIÓDICA", investimento: 3140.00, mes: "03. março", atraso: 47 },
+            { campanha: "PARAFLU0326", fornecedor: "PARAFLU", comprador: "RICARDO", tipo: "PERIÓDICA", investimento: 21010.00, mes: "03. março", atraso: 46 },
+            { campanha: "MAHLE0326 - PESCARIA", fornecedor: "MAHLE", comprador: "CINTHIA", tipo: "PERIÓDICA", investimento: 21850.00, mes: "03. março", atraso: 41 },
+            { campanha: "QUARTA-FOCO DAYCO - 15.04", fornecedor: "DAYCO", comprador: "HUMBERTO", tipo: "DIA FOCO", investimento: 2600.00, mes: "04.abril", atraso: 75 },
+            { campanha: "QUARTA-FOCO PARAFLU - 22.04", fornecedor: "PARAFLU", comprador: "RICARDO", tipo: "DIA FOCO", investimento: 2600.00, mes: "04.abril", atraso: 41 },
+            { campanha: "QUARTA-FOCO RESERPLASTIC 29.04", fornecedor: "RESERPLASTIC", comprador: "MARCELO", tipo: "DIA FOCO", investimento: 2600.00, mes: "04.abril", atraso: 57 },
+            { campanha: "CORTECO0426 - CAMPANHA PARA CLIENTES", fornecedor: "CORTECO", comprador: "CINTHIA", tipo: "PERIÓDICA", investimento: 2700.00, mes: "04.abril", atraso: 4 },
+            { campanha: "DYNA0426", fornecedor: "DYNA", comprador: "RICARDO", tipo: "PERIÓDICA", investimento: 3590.00, mes: "04.abril", atraso: 41 },
+            { campanha: "GATES0426", fornecedor: "GATES", comprador: "VINICIUS", tipo: "PERIÓDICA", investimento: 1440.00, mes: "04.abril", atraso: 40 },
+            { campanha: "VALEO0426", fornecedor: "VALEO", comprador: "MARCELO", tipo: "PERIÓDICA", investimento: 1650.00, mes: "04.abril", atraso: 37 },
+            { campanha: "VALEO0426 - VENDEU, GANHOU!", fornecedor: "VALEO", comprador: "MARCELO", tipo: "PERIÓDICA", investimento: 2000.00, mes: "04.abril", atraso: 36 },
+            { campanha: "SEXTA-FOCO VDO 08.05", fornecedor: "VDO", comprador: "VINICIUS", tipo: "DIA FOCO", investimento: 2600.00, mes: "05.maio", atraso: 50 },
+            { campanha: "SEXTA-FOCO ELRING15.05", fornecedor: "ELRING", comprador: "CINTHIA", tipo: "DIA FOCO", investimento: 2600.00, mes: "05.maio", atraso: 42 },
+            { campanha: "QUARTA-FOCO BINS 20.05", fornecedor: "BINS", comprador: "EDSON", tipo: "DIA FOCO", investimento: 2600.00, mes: "05.maio", atraso: 40 },
+            { campanha: "SEXTA-FOCO FRASLE 29.05", fornecedor: "FRAS-LE", comprador: "EDSON", tipo: "DIA FOCO", investimento: 2600.00, mes: "05.maio", atraso: 21 },
+            { campanha: "COBREQ0526", fornecedor: "COBREQ", comprador: "HUMBERTO", tipo: "PERIÓDICA", investimento: 740.00, mes: "05.maio", atraso: 4 },
+            { campanha: "DYNA0526", fornecedor: "DYNA", comprador: "RICARDO", tipo: "PERIÓDICA", investimento: 2860.00, mes: "05.maio", atraso: 4 },
+            { campanha: "QUARTA-FOCO DAYCO 03.06", fornecedor: "DAYCO", comprador: "HUMBERTO", tipo: "DIA FOCO", investimento: 2600.00, mes: "06.junho", atraso: 25 },
+            { campanha: "SEXTA-FOCO HENGST 05.06", fornecedor: "HENGST", comprador: "MANOEL", tipo: "DIA FOCO", investimento: 2600.00, mes: "06.junho", atraso: 21 },
+            { campanha: "SEXTA-FOCO ZF 12.06", fornecedor: "ZF", comprador: "MANOEL", tipo: "DIA FOCO", investimento: 2600.00, mes: "06.junho", atraso: 14 },
+            { campanha: "QUARTA-FOCO VALEO/FTE 17.06", fornecedor: "VALEO", comprador: "MARCELO", tipo: "DIA FOCO", investimento: 2600.00, mes: "06.junho", atraso: 4 },
+            { campanha: "QUARTA-FOCO FLEETGUARD 24.06", fornecedor: "FLEETGUARD", comprador: "MURILO", tipo: "DIA FOCO", investimento: 2600.00, mes: "06.junho", atraso: 5 },
+            { campanha: "SEXTA-FOCO COBREQ - 26.06", fornecedor: "COBREQ", comprador: "HUMBERTO", tipo: "DIA FOCO", investimento: 2600.00, mes: "06.junho", atraso: 2 }
+        ];
+
+        let chartCompradoresInstance = null;
+        let chartMesesInstance = null;
+        let dadosFiltradosAtuais = [];
+        let colunaOrdenacaoAtual = '';
+        let ordemAscendente = true;
+
+        function formatarMoeda(valor) {
+            return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
+
+        // Reconstrói e reseta os selects de filtro baseando-se na lista atualizada de dados
+        function inicializarFiltros() {
+            const selectComprador = document.getElementById("filterComprador");
+            const selectTipo = document.getElementById("filterTipo");
+            const selectMes = document.getElementById("filterMes");
+
+            // Limpa as opções atuais deixando apenas o padrão
+            selectComprador.innerHTML = '<option value="Todos">Todos os Compradores</option>';
+            selectTipo.innerHTML = '<option value="Todos">Todos os Tipos</option>';
+            selectMes.innerHTML = '<option value="Todos">Todos os Meses</option>';
+
+            const compradores = [...new Set(dadosBrutos.map(d => d.comprador))].filter(Boolean).sort();
+            const tipos = [...new Set(dadosBrutos.map(d => d.tipo))].filter(Boolean).sort();
+            const meses = [...new Set(dadosBrutos.map(d => d.mes))].filter(Boolean).sort();
+
+            compradores.forEach(c => selectComprador.add(new Option(c, c)));
+            tipos.forEach(t => selectTipo.add(new Option(t, t)));
+            meses.forEach(m => selectMes.add(new Option(m, m)));
+        }
+
+        function atualizarDashboard() {
+            const fComprador = document.getElementById("filterComprador").value;
+            const fTipo = document.getElementById("filterTipo").value;
+            const fMes = document.getElementById("filterMes").value;
+
+            dadosFiltradosAtuais = dadosBrutos.filter(d => {
+                return (fComprador === "Todos" || d.comprador === fComprador) &&
+                       (fTipo === "Todos" || d.tipo === fTipo) &&
+                       (fMes === "Todos" || d.mes === fMes);
+            });
+
+            // Mantém a ordenação atual aplicada, se houver
+            if (colunaOrdenacaoAtual) {
+                ordenarDados(colunaOrdenacaoAtual, ordemAscendente);
+            }
+
+            const totalInvestido = dadosFiltradosAtuais.reduce((acc, curr) => acc + curr.investimento, 0);
+            const totalCampanhas = dadosFiltradosAtuais.length;
+            const somaAtraso = dadosFiltradosAtuais.reduce((acc, curr) => acc + curr.atraso, 0);
+            const mediaAtraso = totalCampanhas > 0 ? Math.round(somaAtraso / totalCampanhas) : 0;
+            const maiorInvestimento = totalCampanhas > 0 ? Math.max(...dadosFiltradosAtuais.map(d => d.investimento)) : 0;
+
+            document.getElementById("kpiTotalInvestido").innerText = formatarMoeda(totalInvestido);
+            document.getElementById("kpiTotalCampanhas").innerText = totalCampanhas;
+            document.getElementById("kpiMediaAtraso").innerText = `${mediaAtraso} dias`;
+            document.getElementById("kpiMaiorInvestimento").innerText = formatarMoeda(maiorInvestimento);
+            document.getElementById("txtContadorLinhas").innerText = `Mostrando ${totalCampanhas} registros`;
+
+            renderizarTabela();
+
+            // Agrupando a QUANTIDADE de campanhas por comprador e ordenando do maior para o menor
+            const contagemCompradores = {};
+            dadosFiltradosAtuais.forEach(d => {
+                if(d.comprador) contagemCompradores[d.comprador] = (contagemCompradores[d.comprador] || 0) + 1;
+            });
+            
+            const sortedCompradores = Object.entries(contagemCompradores).sort((a, b) => b[1] - a[1]);
+            const labelsCompradores = sortedCompradores.map(item => item[0]);
+            const dataCompradores = sortedCompradores.map(item => item[1]);
+
+            const investimentoMensal = {};
+            dadosFiltradosAtuais.forEach(d => {
+                if(d.mes) investimentoMensal[d.mes] = (investimentoMensal[d.mes] || 0) + d.investimento;
+            });
+
+            renderizarGraficoCompradores(labelsCompradores, dataCompradores);
+            renderizarGraficoMeses(Object.keys(investimentoMensal), Object.values(investimentoMensal));
+        }
+
+        function ordenarDados(coluna, ascendente) {
+            dadosFiltradosAtuais.sort((a, b) => {
+                let valorA = a[coluna];
+                let valorB = b[coluna];
+
+                if (typeof valorA === 'string') valorA = valorA.toLowerCase();
+                if (typeof valorB === 'string') valorB = valorB.toLowerCase();
+
+                if (valorA < valorB) return ascendente ? -1 : 1;
+                if (valorA > valorB) return ascendente ? 1 : -1;
+                return 0;
+            });
+        }
+
+        function ordenarTabela(coluna) {
+            if (colunaOrdenacaoAtual === coluna) {
+                ordemAscendente = !ordemAscendente;
+            } else {
+                colunaOrdenacaoAtual = coluna;
+                ordemAscendente = true;
+            }
+            
+            ordenarDados(colunaOrdenacaoAtual, ordemAscendente);
+            renderizarTabela();
+        }
+
+        function renderizarTabela() {
+            const corpoTabela = document.getElementById("corpoTabela");
+            corpoTabela.innerHTML = "";
+            
+            dadosFiltradosAtuais.forEach(d => {
+                const tr = document.createElement("tr");
+                tr.className = "hover:bg-slate-700/50 transition-colors";
+                tr.innerHTML = `
+                    <td class="p-4 font-medium">${d.campanha || ''}</td>
+                    <td class="p-4 text-slate-400">${d.fornecedor || ''}</td>
+                    <td class="p-4"><span class="bg-slate-900 px-2 py-1 rounded text-xs">${d.comprador || ''}</span></td>
+                    <td class="p-4 text-xs ${d.tipo === 'DIA FOCO' ? 'text-amber-400' : 'text-purple-400'}">${d.tipo || ''}</td>
+                    <td class="p-4 text-right font-semibold text-emerald-400">${formatarMoeda(d.investimento || 0)}</td>
+                    <td class="p-4 text-slate-400 text-xs">${d.mes || ''}</td>
+                    <td class="p-4 text-right font-mono ${d.atraso > 60 ? 'text-red-400' : 'text-slate-400'}">${d.atraso || 0}</td>
+                `;
+                corpoTabela.appendChild(tr);
+            });
+        }
+
+        // NOVA FUNÇÃO: Processa o arquivo carregado de forma dinâmica
+        function importarNovaBase(input) {
+            const arquivo = input.files[0];
+            if (!arquivo) return;
+
+            Papa.parse(arquivo, {
+                header: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    const dadosMapeados = results.data.map(linha => {
+                        // Tenta encontrar as chaves independente de maiúsculas/minúsculas ou acentos comuns
+                        const getValor = (chavesPossiveis) => {
+                            const chaveEncontrada = Object.keys(linha).find(k => chavesPossiveis.includes(k.trim().toLowerCase()));
+                            return chaveEncontrada ? linha[chaveEncontrada].trim() : '';
+                        };
+
+                        // Tratamento de conversão numérica para o investimento
+                        let rawInvestimento = getValor(['investimento', 'investimento (r$)', 'valor']);
+                        let investimentoLimpo = parseFloat(rawInvestimento.replace(/[R$\s]/g, '').replace(/\./g, '').replace(',', '.'));
+                        if (isNaN(investimentoLimpo)) investimentoLimpo = 0;
+
+                        // Tratamento de conversão numérica para os dias em atraso
+                        let atrasoLimpo = parseInt(getValor(['dias em atraso', 'atraso', 'atraso (dias)']), 10);
+                        if (isNaN(atrasoLimpo)) atrasoLimpo = 0;
+
+                        return {
+                            campanha: getValor(['nome da campanha', 'campanha']),
+                            fornecedor: getValor(['fornecedor']),
+                            comprador: getValor(['comprador']).toUpperCase(),
+                            tipo: getValor(['tipo']).toUpperCase(),
+                            investimento: investimentoLimpo,
+                            mes: getValor(['mês', 'mes']),
+                            atraso: atrasoLimpo
+                        };
+                    });
+
+                    if (dadosMapeados.length > 0) {
+                        dadosBrutos = dadosMapeados;
+                        inicializarFiltros();
+                        atualizarDashboard();
+                        alert("Nova base importada com sucesso!");
+                    } else {
+                        alert("Nenhum dado válido encontrado no arquivo.");
+                    }
+                },
+                error: function(err) {
+                    alert("Erro ao ler o arquivo CSV: " + err.message);
+                }
+            });
+            // Reseta o input para permitir subir o mesmo arquivo se necessário
+            input.value = '';
+        }
+
+        function renderizarGraficoCompradores(labels, data) {
+            if (chartCompradoresInstance) chartCompradoresInstance.destroy();
+            
+            const ctx = document.getElementById('chartCompradores').getContext('2d');
+            chartCompradoresInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        // Paleta de cores atualizada para maior contraste
+                        backgroundColor: [
+                            '#ef4444', '#f97316', '#f59e0b', '#eab308', 
+                            '#84cc16', '#10b981', '#06b6d4', '#3b82f6', 
+                            '#8b5cf6', '#d946ef', '#f43f5e', '#64748b'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right', labels: { color: '#94a3b8', font: { size: 11 } } }
+                    }
+                }
+            });
+        }
+
+        function renderizarGraficoMeses(labels, data) {
+            if (chartMesesInstance) chartMesesInstance.destroy();
+
+            const ctx = document.getElementById('chartMeses').getContext('2d');
+            chartMesesInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Investimento Total',
+                        data: data,
+                        backgroundColor: '#34d399',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: '#94a3b8' } },
+                        y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }
+                    }
+                }
+            });
+        }
+
+        window.onload = function() {
+            inicializarFiltros();
+            atualizarDashboard();
+        };
+    </script>
+</body>
+</html>
