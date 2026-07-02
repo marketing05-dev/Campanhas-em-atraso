@@ -27,6 +27,10 @@
                     <i class="fa-solid fa-file-import"></i> Subir Nova Base (CSV)
                 </button>
                 <input type="file" id="inputArquivoCsv" accept=".csv" class="hidden" onchange="importarNovaBase(this)">
+                
+                <button onclick="restaurarBasePadrao()" class="w-full bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs py-1.5 px-3 rounded transition flex items-center justify-center gap-2 cursor-pointer border border-slate-600 mt-1">
+                    <i class="fa-solid fa-rotate-left"></i> Restaurar Base Padrão
+                </button>
             </div>
 
             <hr class="border-slate-700">
@@ -155,8 +159,8 @@
     </div>
 
     <script>
-        // Transcrição padrão inicial do dashboard
-        let dadosBrutos = [
+        // Base inicial fixa original do dashboard
+        const basePadraoFixa = [
             { campanha: "URBA0126", fornecedor: "URBA", comprador: "BRUNO", tipo: "PERIÓDICA", investimento: 7201.00, mes: "01. janeiro", atraso: 97 },
             { campanha: "PROMETEON0226", fornecedor: "PROMETEON", comprador: "RICARDO", tipo: "PERIÓDICA", investimento: 500.00, mes: "02. fevereiro", atraso: 46 },
             { campanha: "SEXTA-FOCO MONROE - 27.02", fornecedor: "MONROE", comprador: "HUMBERTO", tipo: "DIA FOCO", investimento: 2600.00, mes: "02. fevereiro", atraso: 120 },
@@ -173,7 +177,7 @@
             { campanha: "CORTECO0426 - CAMPANHA PARA CLIENTES", fornecedor: "CORTECO", comprador: "CINTHIA", tipo: "PERIÓDICA", investimento: 2700.00, mes: "04.abril", atraso: 4 },
             { campanha: "DYNA0426", fornecedor: "DYNA", comprador: "RICARDO", tipo: "PERIÓDICA", investimento: 3590.00, mes: "04.abril", atraso: 41 },
             { campanha: "GATES0426", fornecedor: "GATES", comprador: "VINICIUS", tipo: "PERIÓDICA", investimento: 1440.00, mes: "04.abril", atraso: 40 },
-            { campanha: "VALEO0426", fornecedor: "VALEO", comprador: "MARCELO", tipo: "PERIÓDICA", investimento: 1650.00, mes: "04.abril", atraso: 37 },
+            { campaña: "VALEO0426", fornecedor: "VALEO", comprador: "MARCELO", tipo: "PERIÓDICA", investimento: 1650.00, mes: "04.abril", atraso: 37 },
             { campanha: "VALEO0426 - VENDEU, GANHOU!", fornecedor: "VALEO", comprador: "MARCELO", tipo: "PERIÓDICA", investimento: 2000.00, mes: "04.abril", atraso: 36 },
             { campanha: "SEXTA-FOCO VDO 08.05", fornecedor: "VDO", comprador: "VINICIUS", tipo: "DIA FOCO", investimento: 2600.00, mes: "05.maio", atraso: 50 },
             { campanha: "SEXTA-FOCO ELRING15.05", fornecedor: "ELRING", comprador: "CINTHIA", tipo: "DIA FOCO", investimento: 2600.00, mes: "05.maio", atraso: 42 },
@@ -189,6 +193,7 @@
             { campanha: "SEXTA-FOCO COBREQ - 26.06", fornecedor: "COBREQ", comprador: "HUMBERTO", tipo: "DIA FOCO", investimento: 2600.00, mes: "06.junho", atraso: 2 }
         ];
 
+        let dadosBrutos = [];
         let chartCompradoresInstance = null;
         let chartMesesInstance = null;
         let dadosFiltradosAtuais = [];
@@ -199,13 +204,24 @@
             return valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
         }
 
-        // Reconstrói e reseta os selects de filtro baseando-se na lista atualizada de dados
+        function carregarDadosIniciais() {
+            try {
+                const baseSalva = localStorage.getItem('dashboard_base_campanhas');
+                if (baseSalva) {
+                    dadosBrutos = JSON.parse(baseSalva);
+                } else {
+                    dadosBrutos = [...basePadraoFixa];
+                }
+            } catch(e) {
+                dadosBrutos = [...basePadraoFixa];
+            }
+        }
+
         function inicializarFiltros() {
             const selectComprador = document.getElementById("filterComprador");
             const selectTipo = document.getElementById("filterTipo");
             const selectMes = document.getElementById("filterMes");
 
-            // Limpa as opções atuais deixando apenas o padrão
             selectComprador.innerHTML = '<option value="Todos">Todos os Compradores</option>';
             selectTipo.innerHTML = '<option value="Todos">Todos os Tipos</option>';
             selectMes.innerHTML = '<option value="Todos">Todos os Meses</option>';
@@ -230,7 +246,6 @@
                        (fMes === "Todos" || d.mes === fMes);
             });
 
-            // Mantém a ordenação atual aplicada, se houver
             if (colunaOrdenacaoAtual) {
                 ordenarDados(colunaOrdenacaoAtual, ordemAscendente);
             }
@@ -249,7 +264,6 @@
 
             renderizarTabela();
 
-            // Agrupando a QUANTIDADE de campanhas por comprador e ordenando do maior para o menor
             const contagemCompradores = {};
             dadosFiltradosAtuais.forEach(d => {
                 if(d.comprador) contagemCompradores[d.comprador] = (contagemCompradores[d.comprador] || 0) + 1;
@@ -259,13 +273,24 @@
             const labelsCompradores = sortedCompradores.map(item => item[0]);
             const dataCompradores = sortedCompradores.map(item => item[1]);
 
+            // Estrutura estável do gráfico de meses
             const investimentoMensal = {};
-            dadosFiltradosAtuais.forEach(d => {
-                if(d.mes) investimentoMensal[d.mes] = (investimentoMensal[d.mes] || 0) + d.investimento;
+            const todosOsMeses = [...new Set(dadosBrutos.map(d => d.mes))].filter(Boolean).sort();
+            todosOsMeses.forEach(m => {
+                investimentoMensal[m] = 0;
             });
 
+            dadosFiltradosAtuais.forEach(d => {
+                if(d.mes) {
+                    investimentoMensal[d.mes] = (investimentoMensal[d.mes] || 0) + d.investimento;
+                }
+            });
+
+            const mesesOrdenados = Object.keys(investimentoMensal).sort();
+            const investimentoValores = mesesOrdenados.map(m => investimentoMensal[m]);
+
             renderizarGraficoCompradores(labelsCompradores, dataCompradores);
-            renderizarGraficoMeses(Object.keys(investimentoMensal), Object.values(investimentoMensal));
+            renderizarGraficoMeses(mesesOrdenados, investimentoValores);
         }
 
         function ordenarDados(coluna, ascendente) {
@@ -314,7 +339,6 @@
             });
         }
 
-        // NOVA FUNÇÃO: Processa o arquivo carregado de forma dinâmica
         function importarNovaBase(input) {
             const arquivo = input.files[0];
             if (!arquivo) return;
@@ -322,20 +346,19 @@
             Papa.parse(arquivo, {
                 header: true,
                 skipEmptyLines: true,
+                delimiter: ";",
+                encoding: "ISO-8859-1", // CORREÇÃO: Força o PapaParse a ler o arquivo no formato ANSI do Windows/Excel de forma acentuada
                 complete: function(results) {
                     const dadosMapeados = results.data.map(linha => {
-                        // Tenta encontrar as chaves independente de maiúsculas/minúsculas ou acentos comuns
                         const getValor = (chavesPossiveis) => {
                             const chaveEncontrada = Object.keys(linha).find(k => chavesPossiveis.includes(k.trim().toLowerCase()));
-                            return chaveEncontrada ? linha[chaveEncontrada].trim() : '';
+                            return (chaveEncontrada && linha[chaveEncontrada]) ? String(linha[chaveEncontrada]).trim() : '';
                         };
 
-                        // Tratamento de conversão numérica para o investimento
                         let rawInvestimento = getValor(['investimento', 'investimento (r$)', 'valor']);
                         let investimentoLimpo = parseFloat(rawInvestimento.replace(/[R$\s]/g, '').replace(/\./g, '').replace(',', '.'));
                         if (isNaN(investimentoLimpo)) investimentoLimpo = 0;
 
-                        // Tratamento de conversão numérica para os dias em atraso
                         let atrasoLimpo = parseInt(getValor(['dias em atraso', 'atraso', 'atraso (dias)']), 10);
                         if (isNaN(atrasoLimpo)) atrasoLimpo = 0;
 
@@ -350,11 +373,20 @@
                         };
                     });
 
-                    if (dadosMapeados.length > 0) {
-                        dadosBrutos = dadosMapeados;
+                    const dadosValidos = dadosMapeados.filter(d => d.campanha || d.fornecedor);
+
+                    if (dadosValidos.length > 0) {
+                        dadosBrutos = dadosValidos;
+                        
+                        try {
+                            localStorage.setItem('dashboard_base_campanhas', JSON.stringify(dadosBrutos));
+                        } catch(e) {
+                            console.error("Não foi possível salvar no localStorage:", e);
+                        }
+                        
                         inicializarFiltros();
                         atualizarDashboard();
-                        alert("Nova base importada com sucesso!");
+                        alert("Nova base importada e salva com sucesso!");
                     } else {
                         alert("Nenhum dado válido encontrado no arquivo.");
                     }
@@ -363,8 +395,19 @@
                     alert("Erro ao ler o arquivo CSV: " + err.message);
                 }
             });
-            // Reseta o input para permitir subir o mesmo arquivo se necessário
             input.value = '';
+        }
+
+        function restaurarBasePadrao() {
+            if (confirm("Deseja realmente apagar a base importada e voltar para os dados originais?")) {
+                try {
+                    localStorage.removeItem('dashboard_base_campanhas');
+                } catch(e) {}
+                dadosBrutos = [...basePadraoFixa];
+                inicializarFiltros();
+                atualizarDashboard();
+                alert("Base padrão restaurada!");
+            }
         }
 
         function renderizarGraficoCompradores(labels, data) {
@@ -377,7 +420,6 @@
                     labels: labels,
                     datasets: [{
                         data: data,
-                        // Paleta de cores atualizada para maior contraste
                         backgroundColor: [
                             '#ef4444', '#f97316', '#f59e0b', '#eab308', 
                             '#84cc16', '#10b981', '#06b6d4', '#3b82f6', 
@@ -424,6 +466,7 @@
         }
 
         window.onload = function() {
+            carregarDadosIniciais(); 
             inicializarFiltros();
             atualizarDashboard();
         };
