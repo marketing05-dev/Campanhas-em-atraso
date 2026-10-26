@@ -22,38 +22,20 @@
             
             <hr class="border-slate-700">
 
-            <!-- Painel de Sincronização Online -->
-            <div class="bg-slate-900/80 p-3.5 rounded-lg border border-slate-700 space-y-3">
+            <!-- Status Informativo da Sincronização Automática -->
+            <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-700/80 space-y-1.5">
                 <div class="flex items-center justify-between">
                     <span class="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                        <i class="fa-solid fa-cloud text-blue-400"></i> Planilha Online
+                        <i class="fa-solid fa-cloud text-emerald-400"></i> Planilha Online
                     </span>
-                    <span id="indicadorStatus" class="flex h-2.5 w-2.5 relative" title="Conexão ativa">
+                    <span id="indicadorStatus" class="flex h-2.5 w-2.5 relative" title="Conexão">
                         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                         <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                     </span>
                 </div>
-                
-                <p id="txtStatusConexao" class="text-[11px] text-slate-400 leading-tight">
-                    Inicializando conexão...
+                <p id="txtStatus" class="text-[11px] text-slate-400 leading-tight">
+                    Conectando à planilha...
                 </p>
-
-                <button onclick="carregarDadosPlanilhaOnline(true)" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold py-2 px-3 rounded transition flex items-center justify-center gap-2 cursor-pointer shadow-sm">
-                    <i id="iconeSincronizar" class="fa-solid fa-arrows-rotate"></i> Sincronizar Agora
-                </button>
-
-                <!-- Configuração rápida de Link -->
-                <details class="text-[11px] text-slate-400 group">
-                    <summary class="cursor-pointer hover:text-slate-200 transition-colors list-none flex items-center gap-1">
-                        <i class="fa-solid fa-gear text-[10px]"></i> Configurar Link da Planilha
-                    </summary>
-                    <div class="mt-2 space-y-2 pt-2 border-t border-slate-800">
-                        <input type="text" id="inputUrlPlanilha" placeholder="Cole a URL do CSV publicado" class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-[11px] text-slate-200 focus:outline-none focus:border-emerald-500">
-                        <button onclick="salvarLinkPersonalizado()" class="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 text-[11px] py-1 rounded transition">
-                            Salvar Link
-                        </button>
-                    </div>
-                </details>
             </div>
 
             <hr class="border-slate-700">
@@ -186,10 +168,9 @@
 
     <script>
         // =========================================================================
-        // 1. CONFIGURAÇÃO DA PLANILHA EM CSV
-        // Cole aqui o link da sua planilha publicada (Google Sheets / Microsoft)
+        // LINK DA SUA PLANILHA PUBLICADA
         // =========================================================================
-        const LINK_PLANILHA_CSV = "COLE_AQUI_O_LINK_DO_SEU_CSV_PUBLICADO";
+        const LINK_PLANILHA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQDo50mdiyebTLtKTKDNu6U4LkqspyNyVGHqBejfzL5PHaFRhwPOwjh7xG_HZAsiw/pub?output=csv";
 
         let dadosBrutos = [];
         let chartCompradoresInstance = null;
@@ -202,27 +183,20 @@
             return Number(valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
         }
 
-        // =========================================================================
-        // 2. MOTOR DE RECONHECIMENTO E ADAPTAÇÃO DA ESTRUTURA DA PLANILHA
-        // =========================================================================
         function normalizarTexto(txt) {
             return String(txt || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
         }
 
-        // Se a coluna FORNECEDOR não existir na planilha, extrai automaticamente do nome
+        // Dedução automática de fornecedor caso a coluna não venha explicitada
         function inferirFornecedorDoNome(nomeCampanha) {
             if (!nomeCampanha) return "-";
             let s = nomeCampanha.trim();
-
-            // Remove termos de tipo no início (ex: SEXTA-FOCO, QUARTA-FOCO, QUINTA-DIGITAL)
             s = s.replace(/^(SEXTA|QUARTA|QUINTA|SEGUNDA|TERCA|SABADO)[-\s]+(FOCO|DIGITAL)\s*[-:]*\s*/i, '');
-
-            // Pega o primeiro token de palavra (ex: URBA1025 -> URBA; MAHLE FILTROS -> MAHLE)
             const token = s.split(/[\s\-_/0-9]/)[0].trim().toUpperCase();
             return token.length >= 2 ? token : s.split(/\s+/)[0].toUpperCase();
         }
 
-        // Padroniza valores de mês (tanto '07. JULHO' quanto '2026-07-01' ou '01/07/2026')
+        // Normalização flexível de meses
         function normalizarMes(valorMes) {
             if (!valorMes) return "NÃO INFORMADO";
             const valStr = String(valorMes).trim();
@@ -234,22 +208,16 @@
                 '10': '10. OUTUBRO', '11': '11. NOVEMBRO', '12': '12. DEZEMBRO'
             };
 
-            // Formato data ISO (ex: 2026-07-01)
             const matchIso = valStr.match(/^\d{4}-(\d{2})-\d{2}/);
-            if (matchIso) {
-                return nomesMeses[matchIso[1]] || valStr;
-            }
+            if (matchIso) return nomesMeses[matchIso[1]] || valStr;
 
-            // Formato data BR (ex: 01/07/2026)
             const matchBr = valStr.match(/^\d{2}\/(\d{2})\/\d{4}/);
-            if (matchBr) {
-                return nomesMeses[matchBr[1]] || valStr;
-            }
+            if (matchBr) return nomesMeses[matchBr[1]] || valStr;
 
             return valStr.toUpperCase();
         }
 
-        // Analisa e adapta qualquer linha da planilha de acordo com as colunas presentes
+        // Mapeia inteligentemente qualquer variação de nome de coluna
         function adaptarLinhaDaPlanilha(linha) {
             const chaves = Object.keys(linha);
 
@@ -261,23 +229,15 @@
                 return chave && linha[chave] !== undefined && linha[chave] !== null ? String(linha[chave]).trim() : '';
             };
 
-            // 1. Nome da Campanha
             const campanha = buscarValor(['nome da campanha', 'campanha', 'nome']);
-
-            // 2. Fornecedor (usa coluna se existir, senão deduz do nome)
             let fornecedor = buscarValor(['fornecedor', 'fabrica', 'marca']);
             if (!fornecedor && campanha) {
                 fornecedor = inferirFornecedorDoNome(campanha);
             }
 
-            // 3. Comprador
             const comprador = buscarValor(['comprador', 'responsavel', 'compradores']).toUpperCase();
+            let tipo = buscarValor(['tipo', 'tipo de campanha', 'categoria']).toUpperCase().replace('DIA-FOCO', 'DIA FOCO');
 
-            // 4. Tipo (unifica DIA-FOCO / DIA FOCO e limpa espaços)
-            let tipo = buscarValor(['tipo', 'tipo de campanha', 'categoria']).toUpperCase();
-            tipo = tipo.replace('DIA-FOCO', 'DIA FOCO');
-
-            // 5. Investimento (trata moeda R$, ponto e vírgula)
             let rawInvestimento = buscarValor(['investimento', 'investimento (r$)', 'valor', 'total']);
             let investimento = 0;
             if (rawInvestimento) {
@@ -290,122 +250,102 @@
                 investimento = parseFloat(limpo) || 0;
             }
 
-            // 6. Mês
-            const mesRaw = buscarValor(['mes', 'mês', 'data']);
-            const mes = normalizarMes(mesRaw);
-
-            // 7. Atraso / Dias Sem Pagamento
-            let rawAtraso = buscarValor(['dias sem pagamento', 'atraso', 'dias em atraso', 'dias de atraso', 'dias']);
+            const mes = normalizarMes(buscarValor(['mes', 'mês', 'data']));
+            let rawAtraso = buscarValor(['dias sem pagamento', 'atraso', 'dias em atraso', 'dias']);
             let atraso = parseInt(rawAtraso, 10);
             if (isNaN(atraso)) atraso = 0;
 
-            // 8. Situação
             const situacao = buscarValor(['situacao', 'situação', 'status']).toUpperCase();
 
             return { campanha, fornecedor, comprador, tipo, investimento, mes, atraso, situacao };
         }
 
         // =========================================================================
-        // 3. CARREGAMENTO E SINCRONIZAÇÃO VIA URL
+        // REQUISIÇÃO RESILIENTE COM BYPASS DE CORS (MULTILAYER)
         // =========================================================================
-        function obterUrlConfigurada() {
-            const urlSalva = localStorage.getItem('url_planilha_csv_dashboard');
-            let url = urlSalva || LINK_PLANILHA_CSV;
-
-            if (!url || url.includes("COLE_AQUI_O_LINK_DO_SEU_CSV_PUBLICADO")) {
-                return null;
-            }
-
-            // Converte links do Google Sheets automaticamente para CSV export
-            if (url.includes('docs.google.com/spreadsheets') && !url.includes('output=csv') && !url.includes('format=csv')) {
-                const sheetIdMatch = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
-                const gidMatch = url.match(/[?&#]gid=([0-9]+)/);
-                if (sheetIdMatch) {
-                    const sheetId = sheetIdMatch[1];
-                    const gid = gidMatch ? gidMatch[1] : '0';
-                    url = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
+        async function obterCsvPlanilha(urlAlvo) {
+            // Rota 1: Fetch direto
+            try {
+                const resp = await fetch(urlAlvo, { cache: 'no-cache' });
+                if (resp.ok) {
+                    const txt = await resp.text();
+                    if (txt && (txt.includes(',') || txt.includes(';'))) return txt;
                 }
+            } catch (e) {
+                console.warn("Rota direta impedida por segurança do navegador (CORS). Tentando rota 2...");
             }
 
-            return url;
+            // Rota 2: Proxy CORS AllOrigins
+            try {
+                const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(urlAlvo)}&timestamp=${Date.now()}`;
+                const resp = await fetch(proxyUrl);
+                if (resp.ok) {
+                    const txt = await resp.text();
+                    if (txt && (txt.includes(',') || txt.includes(';'))) return txt;
+                }
+            } catch (e) {
+                console.warn("Rota 2 falhou. Tentando rota 3...");
+            }
+
+            // Rota 3: Proxy CodeTabs
+            try {
+                const proxyUrl2 = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(urlAlvo)}`;
+                const resp = await fetch(proxyUrl2);
+                if (resp.ok) {
+                    const txt = await resp.text();
+                    if (txt && (txt.includes(',') || txt.includes(';'))) return txt;
+                }
+            } catch (e) {
+                console.warn("Todas as rotas de busca online foram esgotadas.");
+            }
+
+            throw new Error("Não foi possível carregar o CSV. Verifique a conexão com a internet.");
         }
 
-        async function carregarDadosPlanilhaOnline(usuarioClicou = false) {
-            const txtStatus = document.getElementById("txtStatusConexao");
-            const icone = document.getElementById("iconeSincronizar");
-            const url = obterUrlConfigurada();
-
-            if (!url) {
-                txtStatus.innerHTML = "<span class='text-amber-400'>Aguardando link da planilha.</span> Abra 'Configurar Link' acima.";
-                return;
-            }
-
-            icone.classList.add("fa-spin");
-            txtStatus.innerText = "Sincronizando com a planilha online...";
+        async function carregarDadosPlanilhaOnline() {
+            const txtStatus = document.getElementById("txtStatus");
+            txtStatus.innerText = "Sincronizando dados...";
 
             try {
-                // PapaParse com detecção automática de delimitador (, ou ;)
-                Papa.parse(url, {
-                    download: true,
+                const conteudoCsv = await obterCsvPlanilha(LINK_PLANILHA);
+
+                Papa.parse(conteudoCsv, {
                     header: true,
                     skipEmptyLines: 'greedy',
                     complete: function(results) {
-                        icone.classList.remove("fa-spin");
-
                         if (!results.data || results.data.length === 0) {
-                            txtStatus.innerHTML = "<span class='text-rose-400'>Planilha vazia ou link incorreto.</span>";
+                            txtStatus.innerHTML = "<span class='text-rose-400'>Planilha vazia.</span>";
                             return;
                         }
 
-                        // Mapeia e filtra registros que tenham nome da campanha ou comprador
                         const dadosMapeados = results.data
                             .map(linha => adaptarLinhaDaPlanilha(linha))
                             .filter(d => d.campanha && d.campanha !== '');
 
                         if (dadosMapeados.length === 0) {
-                            txtStatus.innerHTML = "<span class='text-rose-400'>Nenhum dado válido reconhecido.</span>";
+                            txtStatus.innerHTML = "<span class='text-rose-400'>Formato incompatível.</span>";
                             return;
                         }
 
                         dadosBrutos = dadosMapeados;
                         const agora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-                        txtStatus.innerHTML = `<span class="text-emerald-400">Sincronizado às ${agora}</span> (${dadosBrutos.length} registros)`;
+                        txtStatus.innerHTML = `<span class="text-emerald-400 font-semibold">Atualizado às ${agora}</span> (${dadosBrutos.length} campanhas)`;
 
                         inicializarFiltros();
                         atualizarDashboard();
-
-                        if (usuarioClicou) {
-                            // Feedback breve ao usuário
-                            const btn = event?.currentTarget;
-                            if (btn) {
-                                btn.classList.add("ring-2", "ring-emerald-400");
-                                setTimeout(() => btn.classList.remove("ring-2", "ring-emerald-400"), 1000);
-                            }
-                        }
                     },
                     error: function(err) {
-                        icone.classList.remove("fa-spin");
-                        txtStatus.innerHTML = `<span class='text-rose-400'>Erro na conexão:</span> ${err.message}`;
+                        txtStatus.innerHTML = `<span class='text-rose-400'>Erro CSV:</span> ${err.message}`;
                     }
                 });
             } catch (err) {
-                icone.classList.remove("fa-spin");
-                txtStatus.innerHTML = `<span class='text-rose-400'>Falha ao buscar CSV.</span>`;
-            }
-        }
-
-        function salvarLinkPersonalizado() {
-            const input = document.getElementById("inputUrlPlanilha");
-            const valor = input.value.trim();
-            if (valor) {
-                localStorage.setItem('url_planilha_csv_dashboard', valor);
-                alert("Link salvo com sucesso! Sincronizando dados...");
-                carregarDadosPlanilhaOnline(true);
+                txtStatus.innerHTML = `<span class='text-rose-400 font-semibold'>Erro de leitura:</span> verifique a conexão.`;
+                console.error(err);
             }
         }
 
         // =========================================================================
-        // 4. FILTROS, RENDERIZAÇÃO E GRÁFICOS
+        // FILTROS, KPI'S E GRÁFICOS
         // =========================================================================
         function inicializarFiltros() {
             const selectComprador = document.getElementById("filterComprador");
@@ -462,7 +402,7 @@
 
             renderizarTabela();
 
-            // Gráfico por Comprador
+            // Gráfico Comprador
             const contagemCompradores = {};
             dadosFiltradosAtuais.forEach(d => {
                 if(d.comprador) contagemCompradores[d.comprador] = (contagemCompradores[d.comprador] || 0) + 1;
@@ -472,7 +412,7 @@
             const labelsCompradores = sortedCompradores.map(item => item[0]);
             const dataCompradores = sortedCompradores.map(item => item[1]);
 
-            // Gráfico de Investimento Mensal
+            // Gráfico Mês
             const investimentoMensal = {};
             const todosOsMeses = [...new Set(dadosBrutos.map(d => d.mes))].filter(Boolean).sort();
             todosOsMeses.forEach(m => { investimentoMensal[m] = 0; });
@@ -589,15 +529,12 @@
         }
 
         // =========================================================================
-        // 5. INICIALIZAÇÃO
+        // INICIALIZAÇÃO
         // =========================================================================
         window.onload = function() {
-            const urlConfigurada = obterUrlConfigurada();
-            const inputUrl = document.getElementById("inputUrlPlanilha");
-            if (inputUrl && urlConfigurada) {
-                inputUrl.value = urlConfigurada;
-            }
             carregarDadosPlanilhaOnline();
+            // Reconsulta e sincroniza automaticamente a cada 5 minutos
+            setInterval(carregarDadosPlanilhaOnline, 300000);
         };
     </script>
 </body>
