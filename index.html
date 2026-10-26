@@ -1,475 +1,604 @@
-<style>
-/* =======================================================
-   WIDGET FLUTUANTE (PNEU GIRATÓRIO + BALÃO)
-======================================================= */
-#tire-promo-widget {
-    display: none; 
-    position: fixed;
-    right: 30px;
-    bottom: 30px; 
-    z-index: 99998;
-    cursor: pointer;
-    transition: transform 0.25s ease;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campanhas com Pagamento Atrasados</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-900 text-slate-100 font-sans min-h-screen">
 
-#tire-promo-widget:hover {
-    transform: translateY(-4px) scale(1.04);
-}
+    <div class="flex flex-col md:flex-row min-h-screen">
+        
+        <!-- Sidebar -->
+        <aside class="w-full md:w-64 bg-slate-800 p-6 border-r border-slate-700 space-y-6">
+            <div class="flex items-center gap-3 mb-2">
+                <i class="fa-solid fa-chart-pie text-emerald-400 text-2xl"></i>
+                <h1 class="text-xl font-bold tracking-wider">CAMPANHAS</h1>
+            </div>
+            
+            <hr class="border-slate-700">
 
-.tire-badge {
-    background: #ff6600; 
-    color: #ffffff;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    font-size: 11px;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    padding: 7px 15px;
-    border-radius: 20px;
-    box-shadow: 0 6px 14px rgba(255, 102, 0, 0.35);
-    margin-bottom: 10px; 
-    z-index: 2;
-    white-space: nowrap;
-    position: relative;
-    animation: badge-pulse 2.2s infinite ease-in-out;
-}
+            <!-- Painel de Sincronização Online -->
+            <div class="bg-slate-900/80 p-3.5 rounded-lg border border-slate-700 space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <i class="fa-solid fa-cloud text-blue-400"></i> Planilha Online
+                    </span>
+                    <span id="indicadorStatus" class="flex h-2.5 w-2.5 relative" title="Conexão ativa">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                    </span>
+                </div>
+                
+                <p id="txtStatusConexao" class="text-[11px] text-slate-400 leading-tight">
+                    Inicializando conexão...
+                </p>
 
-.tire-badge::after {
-    content: '';
-    position: absolute;
-    bottom: -5px;
-    left: 50%;
-    transform: translateX(-50%);
-    border-width: 5px 5px 0;
-    border-style: solid;
-    border-color: #ff6600 transparent transparent transparent;
-}
+                <button onclick="carregarDadosPlanilhaOnline(true)" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold py-2 px-3 rounded transition flex items-center justify-center gap-2 cursor-pointer shadow-sm">
+                    <i id="iconeSincronizar" class="fa-solid fa-arrows-rotate"></i> Sincronizar Agora
+                </button>
 
-#tire-promo-widget img {
-    width: 110px;
-    height: 110px;
-    filter: drop-shadow(0 12px 18px rgba(0,0,0,0.35));
-    animation: girarPneu 6s linear infinite; 
-    z-index: 1;
-}
+                <!-- Configuração rápida de Link -->
+                <details class="text-[11px] text-slate-400 group">
+                    <summary class="cursor-pointer hover:text-slate-200 transition-colors list-none flex items-center gap-1">
+                        <i class="fa-solid fa-gear text-[10px]"></i> Configurar Link da Planilha
+                    </summary>
+                    <div class="mt-2 space-y-2 pt-2 border-t border-slate-800">
+                        <input type="text" id="inputUrlPlanilha" placeholder="Cole a URL do CSV publicado" class="w-full bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-[11px] text-slate-200 focus:outline-none focus:border-emerald-500">
+                        <button onclick="salvarLinkPersonalizado()" class="w-full bg-slate-700 hover:bg-slate-600 text-slate-200 text-[11px] py-1 rounded transition">
+                            Salvar Link
+                        </button>
+                    </div>
+                </details>
+            </div>
 
-@keyframes girarPneu {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-}
+            <hr class="border-slate-700">
 
-@keyframes badge-pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.04); }
-    100% { transform: scale(1); }
-}
+            <!-- Filtros Avançados -->
+            <div class="space-y-4">
+                <h3 class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Filtros Avançados</h3>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-slate-300">Comprador</label>
+                    <select id="filterComprador" onchange="atualizarDashboard()" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500">
+                        <option value="Todos">Todos os Compradores</option>
+                    </select>
+                </div>
 
-/* =======================================================
-   ESTRUTURA DO POP-UP (ISOLADO E PROFISSIONAL)
-======================================================= */
-#tire-form-popup {
-    display: none;
-    position: fixed;
-    right: 30px;
-    bottom: 180px;
-    width: 380px;
-    background: #18191b;
-    border: 1px solid #2e3238;
-    border-top: 4px solid #ff6600;
-    padding: 26px 22px 24px 22px;
-    border-radius: 14px;
-    box-shadow: 0 25px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04);
-    z-index: 99999;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    max-height: 80vh; 
-    overflow-y: auto;
-    box-sizing: border-box;
-}
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-slate-300">Tipo de Campanha</label>
+                    <select id="filterTipo" onchange="atualizarDashboard()" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500">
+                        <option value="Todos">Todos os Tipos</option>
+                    </select>
+                </div>
 
-/* Seta discreta apontando para o pneu */
-#tire-form-popup::after {
-    content: '';
-    position: absolute;
-    bottom: -9px;
-    right: 75px; 
-    border-width: 9px 8px 0;
-    border-style: solid;
-    border-color: #18191b transparent transparent transparent;
-}
+                <div>
+                    <label class="block text-sm font-medium mb-1 text-slate-300">Mês</label>
+                    <select id="filterMes" onchange="atualizarDashboard()" class="w-full bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-emerald-500">
+                        <option value="Todos">Todos os Meses</option>
+                    </select>
+                </div>
+            </div>
+        </aside>
 
-.close-popup {
-    position: absolute;
-    top: 14px; 
-    right: 18px;
-    font-size: 26px;
-    line-height: 1;
-    color: #6c727e;
-    cursor: pointer;
-    transition: color 0.2s, transform 0.2s;
-}
+        <!-- Área Principal -->
+        <main class="flex-1 p-6 md:p-8 space-y-6 overflow-y-auto">
+            
+            <header class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border-b border-slate-800 pb-4">
+                <div>
+                    <h2 class="text-2xl font-bold">Campanhas com Pagamento Atrasados</h2>
+                    <p class="text-slate-400 text-sm">Alimentado automaticamente a partir da planilha online</p>
+                </div>
+                <div class="bg-slate-800 px-4 py-2 rounded border border-slate-700 text-xs font-mono text-rose-400 font-bold tracking-wider">
+                    SITUAÇÃO: CAMPANHAS EM ATRASO
+                </div>
+            </header>
 
-.close-popup:hover {
-    color: #ff6600;
-    transform: scale(1.15);
-}
+            <!-- Cards KPIs -->
+            <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 flex items-center justify-between shadow-lg">
+                    <div>
+                        <p class="text-slate-400 text-xs font-semibold uppercase">TOTAL VALOR DEVEDOR</p>
+                        <h3 id="kpiTotalInvestido" class="text-2xl font-bold text-emerald-400 mt-1">R$ 0,00</h3>
+                    </div>
+                    <i class="fa-solid fa-money-bill-wave text-slate-600 text-3xl"></i>
+                </div>
 
-.popup-header {
-    text-align: center;
-    margin-bottom: 22px;
-}
+                <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 flex items-center justify-between shadow-lg">
+                    <div>
+                        <p class="text-slate-400 text-xs font-semibold uppercase">Qtd de Campanhas</p>
+                        <h3 id="kpiTotalCampanhas" class="text-2xl font-bold text-blue-400 mt-1">0</h3>
+                    </div>
+                    <i class="fa-solid fa-bullhorn text-slate-600 text-3xl"></i>
+                </div>
 
-.popup-header h3 {
-    margin: 0;
-    font-size: 19px;
-    font-weight: 800;
-    color: #ffffff;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-}
+                <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 flex items-center justify-between shadow-lg">
+                    <div>
+                        <p class="text-slate-400 text-xs font-semibold uppercase">Média Dias em Atraso</p>
+                        <h3 id="kpiMediaAtraso" class="text-2xl font-bold text-amber-500 mt-1">0 dias</h3>
+                    </div>
+                    <i class="fa-solid fa-clock-rotate-left text-slate-600 text-3xl"></i>
+                </div>
 
-.popup-header span {
-    display: block;
-    font-size: 11px;
-    color: #8c93a0;
-    margin-top: 4px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
+                <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 flex items-center justify-between shadow-lg">
+                    <div>
+                        <p class="text-slate-400 text-xs font-semibold uppercase">MAIOR DÉBITO</p>
+                        <h3 id="kpiMaiorInvestimento" class="text-2xl font-bold text-purple-400 mt-1">R$ 0,00</h3>
+                    </div>
+                    <i class="fa-solid fa-ranking-star text-slate-600 text-3xl"></i>
+                </div>
+            </section>
 
-.form-group {
-    margin-bottom: 20px;
-}
+            <!-- Gráficos -->
+            <section class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg">
+                    <h4 class="text-md font-bold mb-4 text-slate-300 flex items-center gap-2">
+                        <i class="fa-solid fa-user-tie text-blue-400"></i> Campanhas por Comprador
+                    </h4>
+                    <div class="relative h-64 flex justify-center">
+                        <canvas id="chartCompradores"></canvas>
+                    </div>
+                </div>
 
-.form-group p {
-    margin: 0 0 8px 0;
-    font-weight: 700;
-    font-size: 13px;
-    color: #e5e7eb;
-    letter-spacing: 0.2px;
-}
+                <div class="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-lg">
+                    <h4 class="text-md font-bold mb-4 text-slate-300 flex items-center gap-2">
+                        <i class="fa-solid fa-chart-bar text-emerald-400"></i> Investimento por Mês (R$)
+                    </h4>
+                    <div class="relative h-64">
+                        <canvas id="chartMeses"></canvas>
+                    </div>
+                </div>
+            </section>
 
-/* =======================================================
-   MÚLTIPLA ESCOLHA ESTILO 'BLOCO DE PNEU' (ORGANIZADO)
-======================================================= */
-.radio-group {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-}
+            <!-- Tabela Detalhada -->
+            <section class="bg-slate-800 rounded-xl border border-slate-700 shadow-lg overflow-hidden">
+                <div class="p-5 border-b border-slate-700 flex justify-between items-center">
+                    <h4 class="text-md font-bold text-slate-300 flex items-center gap-2">
+                        <i class="fa-solid fa-list text-purple-400"></i> Listagem Detalhada
+                    </h4>
+                    <span id="txtContadorLinhas" class="text-xs text-slate-400">Mostrando 0 registros</span>
+                </div>
+                <div class="overflow-x-auto max-h-96">
+                    <table class="w-full text-left border-collapse text-sm">
+                        <thead class="bg-slate-900 text-slate-400 sticky top-0 uppercase text-xs tracking-wider select-none">
+                            <tr>
+                                <th class="p-4 border-b border-slate-700 cursor-pointer hover:text-white transition-colors" onclick="ordenarTabela('campanha')">Nome da Campanha <i class="fa-solid fa-sort ml-1 opacity-50"></i></th>
+                                <th class="p-4 border-b border-slate-700 cursor-pointer hover:text-white transition-colors" onclick="ordenarTabela('fornecedor')">Fornecedor <i class="fa-solid fa-sort ml-1 opacity-50"></i></th>
+                                <th class="p-4 border-b border-slate-700 cursor-pointer hover:text-white transition-colors" onclick="ordenarTabela('comprador')">Comprador <i class="fa-solid fa-sort ml-1 opacity-50"></i></th>
+                                <th class="p-4 border-b border-slate-700 cursor-pointer hover:text-white transition-colors" onclick="ordenarTabela('tipo')">Tipo <i class="fa-solid fa-sort ml-1 opacity-50"></i></th>
+                                <th class="p-4 border-b border-slate-700 text-right cursor-pointer hover:text-white transition-colors" onclick="ordenarTabela('investimento')">Investimento <i class="fa-solid fa-sort ml-1 opacity-50"></i></th>
+                                <th class="p-4 border-b border-slate-700 cursor-pointer hover:text-white transition-colors" onclick="ordenarTabela('mes')">Mês <i class="fa-solid fa-sort ml-1 opacity-50"></i></th>
+                                <th class="p-4 border-b border-slate-700 text-right cursor-pointer hover:text-white transition-colors" onclick="ordenarTabela('atraso')">Atraso (Dias) <i class="fa-solid fa-sort ml-1 opacity-50"></i></th>
+                            </tr>
+                        </thead>
+                        <tbody id="corpoTabela" class="divide-y divide-slate-700 text-slate-300">
+                        </tbody>
+                    </table>
+                </div>
+            </section>
 
-.radio-group input[type="radio"] {
-    display: none;
-}
-
-.radio-group label {
-    flex: 1 1 calc(50% - 8px);
-    background: #22252a;
-    border: 1px solid #333842;
-    color: #cfd4dc;
-    padding: 10px 12px;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 700;
-    text-align: center;
-    cursor: pointer;
-    box-sizing: border-box;
-    transition: all 0.2s ease;
-    user-select: none;
-    position: relative;
-    overflow: hidden;
-}
-
-/* Marca de borracha sutil na lateral do botão */
-.radio-group label::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 4px;
-    background: #3a404c;
-    transition: background 0.2s;
-}
-
-.radio-group label:hover {
-    background: #2a2e35;
-    border-color: #495060;
-    color: #ffffff;
-}
-
-.radio-group input[type="radio"]:checked + label {
-    background: #ff6600;
-    border-color: #ff771a;
-    color: #ffffff;
-    box-shadow: 0 4px 12px rgba(255, 102, 0, 0.35);
-}
-
-.radio-group input[type="radio"]:checked + label::before {
-    background: #ffffff;
-}
-
-/* =======================================================
-   MOLDURA DO CAMPO COM O RASTRO DE PNEU DA REFERÊNCIA
-======================================================= */
-.tire-track-container {
-    position: relative;
-    padding: 8px 10px 10px 10px;
-    margin-top: 5px;
-    border-radius: 10px;
-    background: #111214;
-    border: 1px solid #262930;
-    overflow: hidden;
-}
-
-/* Padrão dos blocos angulares da arte em SVG em volta do campo */
-.track-visual-top,
-.track-visual-bottom {
-    display: block;
-    width: 100%;
-    height: 10px;
-    background-repeat: repeat-x;
-    background-size: 24px 10px;
-    opacity: 0.85;
-}
-
-/* Cravetas angulares superiores inclinadas */
-.track-visual-top {
-    margin-bottom: 5px;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 10'%3E%3Cpolygon points='2,0 8,0 14,10 8,10' fill='%23ff6600' opacity='0.8'/%3E%3Cpolygon points='14,0 20,0 26,10 20,10' fill='%23ffffff' opacity='0.15'/%3E%3C/svg%3E");
-}
-
-/* Cravetas angulares inferiores espelhadas (formando o V do rastro) */
-.track-visual-bottom {
-    margin-top: 5px;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 10'%3E%3Cpolygon points='8,0 14,0 8,10 2,10' fill='%23ff6600' opacity='0.8'/%3E%3Cpolygon points='20,0 26,0 20,10 14,10' fill='%23ffffff' opacity='0.15'/%3E%3C/svg%3E");
-}
-
-/* Campo de digitação 100% legível com fundo branco puro */
-.tire-track-container input.text-input {
-    width: 100%;
-    background: #ffffff !important;
-    color: #1a1a1a !important;
-    border: 1px solid #d1d5db;
-    border-radius: 6px;
-    padding: 11px 13px;
-    font-size: 13.5px;
-    font-weight: 600;
-    box-sizing: border-box;
-    outline: none;
-    transition: border-color 0.2s, box-shadow 0.2s;
-}
-
-.tire-track-container input.text-input::placeholder {
-    color: #8b929e;
-    font-weight: 400;
-}
-
-.tire-track-container input.text-input:focus {
-    border-color: #ff6600;
-    box-shadow: 0 0 0 3px rgba(255, 102, 0, 0.25);
-}
-
-/* Efeito de atrito na moldura ao focar o campo */
-.tire-track-container:focus-within {
-    border-color: #ff6600;
-    box-shadow: 0 0 10px rgba(255, 102, 0, 0.2);
-}
-
-.tire-track-container:focus-within .track-visual-top,
-.tire-track-container:focus-within .track-visual-bottom {
-    opacity: 1;
-}
-
-/* =======================================================
-   BOTÃO DE ENVIO & MENSAGEM FINAL
-======================================================= */
-.btn-submit {
-    width: 100%;
-    background: #ff6600;
-    color: #ffffff;
-    border: none;
-    padding: 14px;
-    font-size: 14.5px;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.8px;
-    border-radius: 8px;
-    cursor: pointer;
-    margin-top: 10px;
-    box-shadow: 0 6px 16px rgba(255, 102, 0, 0.35);
-    transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
-}
-
-.btn-submit:hover {
-    background: #e65c00;
-    transform: translateY(-1px);
-    box-shadow: 0 8px 20px rgba(255, 102, 0, 0.45);
-}
-
-.btn-submit:active {
-    transform: translateY(1px);
-}
-
-#form-success-msg {
-    display: none;
-    text-align: center;
-    color: #10b981;
-    background: rgba(16, 185, 129, 0.1);
-    border: 1px solid #10b981;
-    padding: 14px;
-    border-radius: 8px;
-    font-weight: 700;
-    margin-top: 15px;
-    font-size: 13.5px;
-}
-</style>
-
-<!-- WIDGET FLUTUANTE (PNEU) -->
-<div id="tire-promo-widget">
-    <div class="tire-badge">Pabu Pneus!</div>
-    <img src="https://blogserlider.wordpress.com/wp-content/uploads/2026/10/gemini_generated_image_4rb9va4rb9va4rb9-1.png" alt="Pesquisa de Pneus">
-</div>
-
-<!-- POP-UP COM O FORMULÁRIO -->
-<div id="tire-form-popup">
-    <span class="close-popup" id="btn-close-popup">&times;</span>
-    <div class="popup-header">
-        <h3>Pesquisa Rápida</h3>
-        <span>Atendimento Especializado</span>
+        </main>
     </div>
-    
-    <form id="pneus-form">
-        
-        <div class="form-group">
-            <p>1. Sua empresa comercializa pneus?</p>
-            <div class="radio-group">
-                <input type="radio" id="comercializa-sim" name="comercializa" value="Sim" required><label for="comercializa-sim">Sim</label>
-                <input type="radio" id="comercializa-nao" name="comercializa" value="Não"><label for="comercializa-nao">Não</label>
-            </div>
-        </div>
 
-        <div class="form-group">
-            <p>2. Qual medida você mais compra?</p>
-            <div class="radio-group">
-                <input type="radio" id="med1" name="medida" value="295/80" required><label for="med1">295/80</label>
-                <input type="radio" id="med2" name="medida" value="275/80"><label for="med2">275/80</label>
-                <input type="radio" id="med3" name="medida" value="10.00"><label for="med3">10.00</label>
-                <input type="radio" id="med4" name="medida" value="Outra"><label for="med4">Outra</label>
-            </div>
-            
-            <!-- Campo "Outra" emoldurado com o rastro de pneu e fundo 100% branco -->
-            <div id="wrapper-outra-medida" class="tire-track-container" style="display:none; margin-top: 10px;">
-                <span class="track-visual-top"></span>
-                <input type="text" id="input-outra-medida" name="medida_outra" class="text-input" placeholder="Digite a medida desejada...">
-                <span class="track-visual-bottom"></span>
-            </div>
-        </div>
+    <script>
+        // =========================================================================
+        // 1. CONFIGURAÇÃO DA PLANILHA EM CSV
+        // Cole aqui o link da sua planilha publicada (Google Sheets / Microsoft)
+        // =========================================================================
+        const LINK_PLANILHA_CSV = "COLE_AQUI_O_LINK_DO_SEU_CSV_PUBLICADO";
 
-        <div class="form-group">
-            <p>3. De quanto em quanto tempo você compra pneus?</p>
-            <div class="radio-group">
-                <input type="radio" id="freq1" name="frequencia" value="Todo mês" required><label for="freq1">Todo mês</label>
-                <input type="radio" id="freq2" name="frequencia" value="A cada 3 meses"><label for="freq2">A cada 3 meses</label>
-                <input type="radio" id="freq3" name="frequencia" value="A cada 6 meses"><label for="freq3">A cada 6 meses</label>
-                <input type="radio" id="freq4" name="frequencia" value="Anualmente"><label for="freq4">Anualmente</label>
-            </div>
-        </div>
+        let dadosBrutos = [];
+        let chartCompradoresInstance = null;
+        let chartMesesInstance = null;
+        let dadosFiltradosAtuais = [];
+        let colunaOrdenacaoAtual = '';
+        let ordemAscendente = true;
 
-        <div class="form-group">
-            <p>4. Qual a quantidade média por compra?</p>
-            <div class="radio-group">
-                <input type="radio" id="qtd1" name="quantidade" value="1 a 4" required><label for="qtd1">1 a 4</label>
-                <input type="radio" id="qtd2" name="quantidade" value="5 a 10"><label for="qtd2">5 a 10</label>
-                <input type="radio" id="qtd3" name="quantidade" value="Mais de 10"><label for="qtd3">Mais de 10</label>
-            </div>
-        </div>
+        function formatarMoeda(valor) {
+            return Number(valor || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        }
 
-        <div class="form-group">
-            <p>5. Marca de preferência?</p>
-            <div class="tire-track-container">
-                <span class="track-visual-top"></span>
-                <input type="text" name="marca" class="text-input" placeholder="Ex: Michelin, Pirelli, Goodyear..." required>
-                <span class="track-visual-bottom"></span>
-            </div>
-        </div>
-        
-        <div class="form-group">
-            <p>Informe o CNPJ da empresa:</p>
-            <div class="tire-track-container">
-                <span class="track-visual-top"></span>
-                <input type="text" id="cnpj-input" name="cnpj" class="text-input" placeholder="00.000.000/0000-00" maxlength="18" required>
-                <span class="track-visual-bottom"></span>
-            </div>
-        </div>
+        // =========================================================================
+        // 2. MOTOR DE RECONHECIMENTO E ADAPTAÇÃO DA ESTRUTURA DA PLANILHA
+        // =========================================================================
+        function normalizarTexto(txt) {
+            return String(txt || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+        }
 
-        <button type="submit" class="btn-submit">Enviar Respostas</button>
-    </form>
-    <div id="form-success-msg">Obrigado! Suas respostas foram registradas com sucesso.</div>
-</div>
+        // Se a coluna FORNECEDOR não existir na planilha, extrai automaticamente do nome
+        function inferirFornecedorDoNome(nomeCampanha) {
+            if (!nomeCampanha) return "-";
+            let s = nomeCampanha.trim();
 
-<script>
-require(['jquery'], function($) {
-    $(document).ready(function() {
-        
-        setTimeout(function() {
-            $('#tire-promo-widget').fadeIn(600);
-        }, 1500);
+            // Remove termos de tipo no início (ex: SEXTA-FOCO, QUARTA-FOCO, QUINTA-DIGITAL)
+            s = s.replace(/^(SEXTA|QUARTA|QUINTA|SEGUNDA|TERCA|SABADO)[-\s]+(FOCO|DIGITAL)\s*[-:]*\s*/i, '');
 
-        $('#tire-promo-widget').on('click', function() {
-            $('#tire-form-popup').fadeToggle(250);
-        });
+            // Pega o primeiro token de palavra (ex: URBA1025 -> URBA; MAHLE FILTROS -> MAHLE)
+            const token = s.split(/[\s\-_/0-9]/)[0].trim().toUpperCase();
+            return token.length >= 2 ? token : s.split(/\s+/)[0].toUpperCase();
+        }
 
-        $('#btn-close-popup').on('click', function() {
-            $('#tire-form-popup').fadeOut(200);
-        });
+        // Padroniza valores de mês (tanto '07. JULHO' quanto '2026-07-01' ou '01/07/2026')
+        function normalizarMes(valorMes) {
+            if (!valorMes) return "NÃO INFORMADO";
+            const valStr = String(valorMes).trim();
 
-        $('input[name="medida"]').on('change', function() {
-            if ($(this).val() === 'Outra') {
-                $('#wrapper-outra-medida').slideDown(200);
-                $('#input-outra-medida').prop('required', true).focus();
-            } else {
-                $('#wrapper-outra-medida').slideUp(200);
-                $('#input-outra-medida').prop('required', false).val('');
+            const nomesMeses = {
+                '01': '01. JANEIRO', '02': '02. FEVEREIRO', '03': '03. MARÇO',
+                '04': '04. ABRIL', '05': '05. MAIO', '06': '06. JUNHO',
+                '07': '07. JULHO', '08': '08. AGOSTO', '09': '09. SETEMBRO',
+                '10': '10. OUTUBRO', '11': '11. NOVEMBRO', '12': '12. DEZEMBRO'
+            };
+
+            // Formato data ISO (ex: 2026-07-01)
+            const matchIso = valStr.match(/^\d{4}-(\d{2})-\d{2}/);
+            if (matchIso) {
+                return nomesMeses[matchIso[1]] || valStr;
             }
-        });
 
-        $('#cnpj-input').on('input', function(){
-            var v = $(this).val().replace(/\D/g, ""); 
-            v = v.replace(/^(\d{2})(\d)/, "$1.$2");
-            v = v.replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3");
-            v = v.replace(/\.(\d{3})(\d)/, ".$1/$2");
-            v = v.replace(/(\d{4})(\d)/, "$1-$2");
-            $(this).val(v);
-        });
+            // Formato data BR (ex: 01/07/2026)
+            const matchBr = valStr.match(/^\d{2}\/(\d{2})\/\d{4}/);
+            if (matchBr) {
+                return nomesMeses[matchBr[1]] || valStr;
+            }
 
-        $('#pneus-form').on('submit', function(e) {
-            e.preventDefault();
-            var scriptURL = 'COLE_SUA_URL_AQUI'; 
-            var formData = $(this).serialize(); 
+            return valStr.toUpperCase();
+        }
+
+        // Analisa e adapta qualquer linha da planilha de acordo com as colunas presentes
+        function adaptarLinhaDaPlanilha(linha) {
+            const chaves = Object.keys(linha);
+
+            const buscarValor = (nomesPossiveis) => {
+                const chave = chaves.find(k => {
+                    const normK = normalizarTexto(k);
+                    return nomesPossiveis.some(p => normK === normalizarTexto(p) || normK.includes(normalizarTexto(p)));
+                });
+                return chave && linha[chave] !== undefined && linha[chave] !== null ? String(linha[chave]).trim() : '';
+            };
+
+            // 1. Nome da Campanha
+            const campanha = buscarValor(['nome da campanha', 'campanha', 'nome']);
+
+            // 2. Fornecedor (usa coluna se existir, senão deduz do nome)
+            let fornecedor = buscarValor(['fornecedor', 'fabrica', 'marca']);
+            if (!fornecedor && campanha) {
+                fornecedor = inferirFornecedorDoNome(campanha);
+            }
+
+            // 3. Comprador
+            const comprador = buscarValor(['comprador', 'responsavel', 'compradores']).toUpperCase();
+
+            // 4. Tipo (unifica DIA-FOCO / DIA FOCO e limpa espaços)
+            let tipo = buscarValor(['tipo', 'tipo de campanha', 'categoria']).toUpperCase();
+            tipo = tipo.replace('DIA-FOCO', 'DIA FOCO');
+
+            // 5. Investimento (trata moeda R$, ponto e vírgula)
+            let rawInvestimento = buscarValor(['investimento', 'investimento (r$)', 'valor', 'total']);
+            let investimento = 0;
+            if (rawInvestimento) {
+                let limpo = rawInvestimento.replace(/[R$\s]/g, '');
+                if (limpo.includes(',') && limpo.includes('.')) {
+                    limpo = limpo.replace(/\./g, '').replace(',', '.');
+                } else if (limpo.includes(',')) {
+                    limpo = limpo.replace(',', '.');
+                }
+                investimento = parseFloat(limpo) || 0;
+            }
+
+            // 6. Mês
+            const mesRaw = buscarValor(['mes', 'mês', 'data']);
+            const mes = normalizarMes(mesRaw);
+
+            // 7. Atraso / Dias Sem Pagamento
+            let rawAtraso = buscarValor(['dias sem pagamento', 'atraso', 'dias em atraso', 'dias de atraso', 'dias']);
+            let atraso = parseInt(rawAtraso, 10);
+            if (isNaN(atraso)) atraso = 0;
+
+            // 8. Situação
+            const situacao = buscarValor(['situacao', 'situação', 'status']).toUpperCase();
+
+            return { campanha, fornecedor, comprador, tipo, investimento, mes, atraso, situacao };
+        }
+
+        // =========================================================================
+        // 3. CARREGAMENTO E SINCRONIZAÇÃO VIA URL
+        // =========================================================================
+        function obterUrlConfigurada() {
+            const urlSalva = localStorage.getItem('url_planilha_csv_dashboard');
+            let url = urlSalva || LINK_PLANILHA_CSV;
+
+            if (!url || url.includes("COLE_AQUI_O_LINK_DO_SEU_CSV_PUBLICADO")) {
+                return null;
+            }
+
+            // Converte links do Google Sheets automaticamente para CSV export
+            if (url.includes('docs.google.com/spreadsheets') && !url.includes('output=csv') && !url.includes('format=csv')) {
+                const sheetIdMatch = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+                const gidMatch = url.match(/[?&#]gid=([0-9]+)/);
+                if (sheetIdMatch) {
+                    const sheetId = sheetIdMatch[1];
+                    const gid = gidMatch ? gidMatch[1] : '0';
+                    url = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
+                }
+            }
+
+            return url;
+        }
+
+        async function carregarDadosPlanilhaOnline(usuarioClicou = false) {
+            const txtStatus = document.getElementById("txtStatusConexao");
+            const icone = document.getElementById("iconeSincronizar");
+            const url = obterUrlConfigurada();
+
+            if (!url) {
+                txtStatus.innerHTML = "<span class='text-amber-400'>Aguardando link da planilha.</span> Abra 'Configurar Link' acima.";
+                return;
+            }
+
+            icone.classList.add("fa-spin");
+            txtStatus.innerText = "Sincronizando com a planilha online...";
+
+            try {
+                // PapaParse com detecção automática de delimitador (, ou ;)
+                Papa.parse(url, {
+                    download: true,
+                    header: true,
+                    skipEmptyLines: 'greedy',
+                    complete: function(results) {
+                        icone.classList.remove("fa-spin");
+
+                        if (!results.data || results.data.length === 0) {
+                            txtStatus.innerHTML = "<span class='text-rose-400'>Planilha vazia ou link incorreto.</span>";
+                            return;
+                        }
+
+                        // Mapeia e filtra registros que tenham nome da campanha ou comprador
+                        const dadosMapeados = results.data
+                            .map(linha => adaptarLinhaDaPlanilha(linha))
+                            .filter(d => d.campanha && d.campanha !== '');
+
+                        if (dadosMapeados.length === 0) {
+                            txtStatus.innerHTML = "<span class='text-rose-400'>Nenhum dado válido reconhecido.</span>";
+                            return;
+                        }
+
+                        dadosBrutos = dadosMapeados;
+                        const agora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                        txtStatus.innerHTML = `<span class="text-emerald-400">Sincronizado às ${agora}</span> (${dadosBrutos.length} registros)`;
+
+                        inicializarFiltros();
+                        atualizarDashboard();
+
+                        if (usuarioClicou) {
+                            // Feedback breve ao usuário
+                            const btn = event?.currentTarget;
+                            if (btn) {
+                                btn.classList.add("ring-2", "ring-emerald-400");
+                                setTimeout(() => btn.classList.remove("ring-2", "ring-emerald-400"), 1000);
+                            }
+                        }
+                    },
+                    error: function(err) {
+                        icone.classList.remove("fa-spin");
+                        txtStatus.innerHTML = `<span class='text-rose-400'>Erro na conexão:</span> ${err.message}`;
+                    }
+                });
+            } catch (err) {
+                icone.classList.remove("fa-spin");
+                txtStatus.innerHTML = `<span class='text-rose-400'>Falha ao buscar CSV.</span>`;
+            }
+        }
+
+        function salvarLinkPersonalizado() {
+            const input = document.getElementById("inputUrlPlanilha");
+            const valor = input.value.trim();
+            if (valor) {
+                localStorage.setItem('url_planilha_csv_dashboard', valor);
+                alert("Link salvo com sucesso! Sincronizando dados...");
+                carregarDadosPlanilhaOnline(true);
+            }
+        }
+
+        // =========================================================================
+        // 4. FILTROS, RENDERIZAÇÃO E GRÁFICOS
+        // =========================================================================
+        function inicializarFiltros() {
+            const selectComprador = document.getElementById("filterComprador");
+            const selectTipo = document.getElementById("filterTipo");
+            const selectMes = document.getElementById("filterMes");
+
+            const valorAnteriorComprador = selectComprador.value;
+            const valorAnteriorTipo = selectTipo.value;
+            const valorAnteriorMes = selectMes.value;
+
+            selectComprador.innerHTML = '<option value="Todos">Todos os Compradores</option>';
+            selectTipo.innerHTML = '<option value="Todos">Todos os Tipos</option>';
+            selectMes.innerHTML = '<option value="Todos">Todos os Meses</option>';
+
+            const compradores = [...new Set(dadosBrutos.map(d => d.comprador))].filter(Boolean).sort();
+            const tipos = [...new Set(dadosBrutos.map(d => d.tipo))].filter(Boolean).sort();
+            const meses = [...new Set(dadosBrutos.map(d => d.mes))].filter(Boolean).sort();
+
+            compradores.forEach(c => selectComprador.add(new Option(c, c)));
+            tipos.forEach(t => selectTipo.add(new Option(t, t)));
+            meses.forEach(m => selectMes.add(new Option(m, m)));
+
+            if (compradores.includes(valorAnteriorComprador)) selectComprador.value = valorAnteriorComprador;
+            if (tipos.includes(valorAnteriorTipo)) selectTipo.value = valorAnteriorTipo;
+            if (meses.includes(valorAnteriorMes)) selectMes.value = valorAnteriorMes;
+        }
+
+        function atualizarDashboard() {
+            const fComprador = document.getElementById("filterComprador").value;
+            const fTipo = document.getElementById("filterTipo").value;
+            const fMes = document.getElementById("filterMes").value;
+
+            dadosFiltradosAtuais = dadosBrutos.filter(d => {
+                return (fComprador === "Todos" || d.comprador === fComprador) &&
+                       (fTipo === "Todos" || d.tipo === fTipo) &&
+                       (fMes === "Todos" || d.mes === fMes);
+            });
+
+            if (colunaOrdenacaoAtual) {
+                ordenarDados(colunaOrdenacaoAtual, ordemAscendente);
+            }
+
+            const totalInvestido = dadosFiltradosAtuais.reduce((acc, curr) => acc + curr.investimento, 0);
+            const totalCampanhas = dadosFiltradosAtuais.length;
+            const somaAtraso = dadosFiltradosAtuais.reduce((acc, curr) => acc + curr.atraso, 0);
+            const mediaAtraso = totalCampanhas > 0 ? Math.round(somaAtraso / totalCampanhas) : 0;
+            const maiorInvestimento = totalCampanhas > 0 ? Math.max(...dadosFiltradosAtuais.map(d => d.investimento)) : 0;
+
+            document.getElementById("kpiTotalInvestido").innerText = formatarMoeda(totalInvestido);
+            document.getElementById("kpiTotalCampanhas").innerText = totalCampanhas;
+            document.getElementById("kpiMediaAtraso").innerText = `${mediaAtraso} dias`;
+            document.getElementById("kpiMaiorInvestimento").innerText = formatarMoeda(maiorInvestimento);
+            document.getElementById("txtContadorLinhas").innerText = `Mostrando ${totalCampanhas} registros`;
+
+            renderizarTabela();
+
+            // Gráfico por Comprador
+            const contagemCompradores = {};
+            dadosFiltradosAtuais.forEach(d => {
+                if(d.comprador) contagemCompradores[d.comprador] = (contagemCompradores[d.comprador] || 0) + 1;
+            });
             
-            $('.btn-submit').text('Enviando...').prop('disabled', true);
+            const sortedCompradores = Object.entries(contagemCompradores).sort((a, b) => b[1] - a[1]);
+            const labelsCompradores = sortedCompradores.map(item => item[0]);
+            const dataCompradores = sortedCompradores.map(item => item[1]);
 
-            $.ajax({
-                url: scriptURL,
-                type: 'POST',
-                data: formData,
-                success: function(response) {
-                    $('#pneus-form').hide();
-                    $('#form-success-msg').fadeIn();
-                    setTimeout(function(){
-                        $('#tire-form-popup').fadeOut(300);
-                    }, 3000);
-                },
-                error: function() {
-                    alert('Houve um erro ao enviar. Tente novamente.');
-                    $('.btn-submit').text('Enviar Respostas').prop('disabled', false);
+            // Gráfico de Investimento Mensal
+            const investimentoMensal = {};
+            const todosOsMeses = [...new Set(dadosBrutos.map(d => d.mes))].filter(Boolean).sort();
+            todosOsMeses.forEach(m => { investimentoMensal[m] = 0; });
+
+            dadosFiltradosAtuais.forEach(d => {
+                if(d.mes) {
+                    investimentoMensal[d.mes] = (investimentoMensal[d.mes] || 0) + d.investimento;
                 }
             });
-        });
-    });
-});
-</script>
+
+            const mesesOrdenados = Object.keys(investimentoMensal).sort();
+            const investimentoValores = mesesOrdenados.map(m => investimentoMensal[m]);
+
+            renderizarGraficoCompradores(labelsCompradores, dataCompradores);
+            renderizarGraficoMeses(mesesOrdenados, investimentoValores);
+        }
+
+        function ordenarDados(coluna, ascendente) {
+            dadosFiltradosAtuais.sort((a, b) => {
+                let valorA = a[coluna];
+                let valorB = b[coluna];
+
+                if (typeof valorA === 'string') valorA = valorA.toLowerCase();
+                if (typeof valorB === 'string') valorB = valorB.toLowerCase();
+
+                if (valorA < valorB) return ascendente ? -1 : 1;
+                if (valorA > valorB) return ascendente ? 1 : -1;
+                return 0;
+            });
+        }
+
+        function ordenarTabela(coluna) {
+            if (colunaOrdenacaoAtual === coluna) {
+                ordemAscendente = !ordemAscendente;
+            } else {
+                colunaOrdenacaoAtual = coluna;
+                ordemAscendente = true;
+            }
+            ordenarDados(colunaOrdenacaoAtual, ordemAscendente);
+            renderizarTabela();
+        }
+
+        function renderizarTabela() {
+            const corpoTabela = document.getElementById("corpoTabela");
+            corpoTabela.innerHTML = "";
+            
+            dadosFiltradosAtuais.forEach(d => {
+                const tr = document.createElement("tr");
+                tr.className = "hover:bg-slate-700/50 transition-colors";
+                tr.innerHTML = `
+                    <td class="p-4 font-medium text-slate-200">${d.campanha || ''}</td>
+                    <td class="p-4 text-slate-400 font-semibold">${d.fornecedor || '-'}</td>
+                    <td class="p-4"><span class="bg-slate-900 border border-slate-700 px-2 py-1 rounded text-xs">${d.comprador || ''}</span></td>
+                    <td class="p-4 text-xs ${d.tipo.includes('DIA') ? 'text-amber-400 font-medium' : 'text-purple-400'}">${d.tipo || ''}</td>
+                    <td class="p-4 text-right font-semibold text-emerald-400">${formatarMoeda(d.investimento || 0)}</td>
+                    <td class="p-4 text-slate-400 text-xs">${d.mes || ''}</td>
+                    <td class="p-4 text-right font-mono ${d.atraso > 60 ? 'text-rose-400 font-bold' : 'text-slate-400'}">${d.atraso || 0}</td>
+                `;
+                corpoTabela.appendChild(tr);
+            });
+        }
+
+        function renderizarGraficoCompradores(labels, data) {
+            if (chartCompradoresInstance) chartCompradoresInstance.destroy();
+            const ctx = document.getElementById('chartCompradores').getContext('2d');
+            chartCompradoresInstance = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: [
+                            '#ef4444', '#f97316', '#f59e0b', '#eab308', 
+                            '#84cc16', '#10b981', '#06b6d4', '#3b82f6', 
+                            '#8b5cf6', '#d946ef', '#f43f5e', '#64748b'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right', labels: { color: '#94a3b8', font: { size: 11 } } }
+                    }
+                }
+            });
+        }
+
+        function renderizarGraficoMeses(labels, data) {
+            if (chartMesesInstance) chartMesesInstance.destroy();
+            const ctx = document.getElementById('chartMeses').getContext('2d');
+            chartMesesInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Investimento Total',
+                        data: data,
+                        backgroundColor: '#34d399',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false }, ticks: { color: '#94a3b8' } },
+                        y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8' } }
+                    }
+                }
+            });
+        }
+
+        // =========================================================================
+        // 5. INICIALIZAÇÃO
+        // =========================================================================
+        window.onload = function() {
+            const urlConfigurada = obterUrlConfigurada();
+            const inputUrl = document.getElementById("inputUrlPlanilha");
+            if (inputUrl && urlConfigurada) {
+                inputUrl.value = urlConfigurada;
+            }
+            carregarDadosPlanilhaOnline();
+        };
+    </script>
+</body>
+</html>
