@@ -22,19 +22,19 @@
             
             <hr class="border-slate-700">
 
-            <!-- Status Informativo de Sincronização -->
+            <!-- Status Informativo -->
             <div class="bg-slate-900/60 p-3 rounded-lg border border-slate-700/80 space-y-1.5">
                 <div class="flex items-center justify-between">
                     <span class="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
                         <i class="fa-solid fa-cloud text-emerald-400"></i> Planilha Online
                     </span>
-                    <span id="indicadorStatus" class="flex h-2.5 w-2.5 relative" title="Conexão">
+                    <span id="indicadorStatus" class="flex h-2.5 w-2.5 relative" title="Conexão Ativa">
                         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                         <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                     </span>
                 </div>
                 <p id="txtStatus" class="text-[11px] text-slate-400 leading-tight">
-                    Conectando à base...
+                    Carregando dados...
                 </p>
             </div>
 
@@ -167,17 +167,9 @@
     </div>
 
     <script>
-        // Links com diferentes rotas para garantir compatibilidade total
-        const URLS_TENTATIVA = [
-            // Rota 1: GViz direto (API pública do Google sem bloqueio de CORS)
-            "https://docs.google.com/spreadsheets/d/e/2PACX-1vQDo50mdiyebTLtKTKDNu6U4LkqspyNyVGHqBejfzL5PHaFRhwPOwjh7xG_HZAsiw/gviz/tq?tqx=out:csv&gid=1994805956",
-            // Rota 2: Seu link publicado original
-            "https://docs.google.com/spreadsheets/d/e/2PACX-1vQDo50mdiyebTLtKTKDNu6U4LkqspyNyVGHqBejfzL5PHaFRhwPOwjh7xG_HZAsiw/pub?gid=1994805956&single=true&output=csv",
-            // Rota 3: Proxy AllOrigins (garantia para quando aberto em file://)
-            "https://api.allorigins.win/raw?url=" + encodeURIComponent("https://docs.google.com/spreadsheets/d/e/2PACX-1vQDo50mdiyebTLtKTKDNu6U4LkqspyNyVGHqBejfzL5PHaFRhwPOwjh7xG_HZAsiw/pub?gid=1994805956&single=true&output=csv"),
-            // Rota 4: Proxy CodeTabs
-            "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent("https://docs.google.com/spreadsheets/d/e/2PACX-1vQDo50mdiyebTLtKTKDNu6U4LkqspyNyVGHqBejfzL5PHaFRhwPOwjh7xG_HZAsiw/pub?gid=1994805956&single=true&output=csv")
-        ];
+        // Configurações do Google Sheets
+        const DOC_ID = "2PACX-1vQDo50mdiyebTLtKTKDNu6U4LkqspyNyVGHqBejfzL5PHaFRhwPOwjh7xG_HZAsiw";
+        const GID = "1994805956";
 
         let dadosBrutos = [];
         let chartCompradoresInstance = null;
@@ -222,6 +214,18 @@
             return valStr.toUpperCase();
         }
 
+        function extrairInvestimento(val) {
+            if (typeof val === 'number') return val;
+            if (!val) return 0;
+            let limpo = String(val).replace(/[R$\s]/g, '');
+            if (limpo.includes(',') && limpo.includes('.')) {
+                limpo = limpo.replace(/\./g, '').replace(',', '.');
+            } else if (limpo.includes(',')) {
+                limpo = limpo.replace(',', '.');
+            }
+            return parseFloat(limpo) || 0;
+        }
+
         function adaptarLinhaDaPlanilha(linha) {
             const chaves = Object.keys(linha);
 
@@ -230,104 +234,99 @@
                     const normK = normalizarTexto(k);
                     return nomesPossiveis.some(p => normK === normalizarTexto(p) || normK.includes(normalizarTexto(p)));
                 });
-                return chave && linha[chave] !== undefined && linha[chave] !== null ? String(linha[chave]).trim() : '';
+                return chave && linha[chave] !== undefined && linha[chave] !== null ? linha[chave] : '';
             };
 
-            const campanha = buscarValor(['nome da campanha', 'campanha', 'nome']);
-            let fornecedor = buscarValor(['fornecedor', 'fabrica', 'marca']);
+            const campanha = String(buscarValor(['nome da campanha', 'campanha', 'nome'])).trim();
+            let fornecedor = String(buscarValor(['fornecedor', 'fabrica', 'marca'])).trim();
             if (!fornecedor && campanha) {
                 fornecedor = inferirFornecedorDoNome(campanha);
             }
 
-            const comprador = buscarValor(['comprador', 'responsavel', 'compradores']).toUpperCase();
-            let tipo = buscarValor(['tipo', 'tipo de campanha', 'categoria']).toUpperCase().replace('DIA-FOCO', 'DIA FOCO');
+            const comprador = String(buscarValor(['comprador', 'responsavel', 'compradores'])).trim().toUpperCase();
+            let tipo = String(buscarValor(['tipo', 'tipo de campanha', 'categoria'])).trim().toUpperCase().replace('DIA-FOCO', 'DIA FOCO');
 
             let rawInvestimento = buscarValor(['investimento', 'investimento (r$)', 'valor', 'total']);
-            let investimento = 0;
-            if (rawInvestimento) {
-                let limpo = rawInvestimento.replace(/[R$\s]/g, '');
-                if (limpo.includes(',') && limpo.includes('.')) {
-                    limpo = limpo.replace(/\./g, '').replace(',', '.');
-                } else if (limpo.includes(',')) {
-                    limpo = limpo.replace(',', '.');
-                }
-                investimento = parseFloat(limpo) || 0;
-            }
+            let investimento = extrairInvestimento(rawInvestimento);
 
             const mes = normalizarMes(buscarValor(['mes', 'mês', 'data']));
             let rawAtraso = buscarValor(['dias sem pagamento', 'atraso', 'dias em atraso', 'dias']);
             let atraso = parseInt(rawAtraso, 10);
             if (isNaN(atraso)) atraso = 0;
 
-            const situacao = buscarValor(['situacao', 'situação', 'status']).toUpperCase();
+            const situacao = String(buscarValor(['situacao', 'situação', 'status'])).trim().toUpperCase();
 
             return { campanha, fornecedor, comprador, tipo, investimento, mes, atraso, situacao };
         }
 
-        // Busca sequencial com tratamento específico de rede
-        async function baixarCsvMultiplo() {
-            let ultimoErro = null;
-
-            for (let i = 0; i < URLS_TENTATIVA.length; i++) {
-                const url = URLS_TENTATIVA[i];
-                try {
-                    const resp = await fetch(url, { cache: 'no-cache' });
-                    if (resp.ok) {
-                        const texto = await resp.text();
-                        // Confirma se o retorno é um CSV válido com cabeçalhos esperados
-                        if (texto && (texto.includes('CAMPANHA') || texto.includes(',') || texto.includes(';'))) {
-                            return texto;
-                        }
-                    }
-                } catch (e) {
-                    ultimoErro = e;
-                    console.warn(`Tentativa ${i + 1} falhou, tentando próxima rota...`);
-                }
-            }
-
-            throw ultimoErro || new Error("Não foi possível acessar a planilha.");
-        }
-
-        async function carregarDadosPlanilhaOnline() {
-            const txtStatus = document.getElementById("txtStatus");
-            txtStatus.innerText = "Sincronizando com a base...";
-
+        // =========================================================================
+        // CALLBACK DO GOOGLE JSONP (Sem bloqueio de CORS / Sem depender de proxy)
+        // =========================================================================
+        window.receberDadosPlanilha = function(response) {
             try {
-                const conteudoCsv = await baixarCsvMultiplo();
+                if (!response || !response.table) {
+                    throw new Error("Resposta vazia da API do Google.");
+                }
 
-                Papa.parse(conteudoCsv, {
-                    header: true,
-                    skipEmptyLines: 'greedy',
-                    complete: function(results) {
-                        if (!results.data || results.data.length === 0) {
-                            txtStatus.innerHTML = "<span class='text-rose-400'>Planilha vazia.</span>";
-                            return;
-                        }
+                const table = response.table;
+                let colunas = table.cols.map(c => (c && c.label) ? c.label.trim() : '');
 
-                        const dadosMapeados = results.data
-                            .map(linha => adaptarLinhaDaPlanilha(linha))
-                            .filter(d => d.campanha && d.campanha !== '');
+                // Se os rótulos de coluna não vierem no cols, pega da 1ª linha
+                let inicioLinhas = 0;
+                const temRotulos = colunas.some(c => c !== '');
+                if (!temRotulos && table.rows.length > 0) {
+                    colunas = table.rows[0].c.map(cell => (cell && cell.v !== null) ? String(cell.v).trim() : '');
+                    inicioLinhas = 1;
+                }
 
-                        if (dadosMapeados.length === 0) {
-                            txtStatus.innerHTML = "<span class='text-rose-400'>Colunas incompatíveis.</span>";
-                            return;
-                        }
+                const linhasObjetos = [];
+                for (let r = inicioLinhas; r < table.rows.length; r++) {
+                    const row = table.rows[r];
+                    if (!row || !row.c) continue;
 
-                        dadosBrutos = dadosMapeados;
-                        const agora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-                        txtStatus.innerHTML = `<span class="text-emerald-400 font-semibold">Atualizado às ${agora}</span> (${dadosBrutos.length} campanhas)`;
+                    const obj = {};
+                    row.c.forEach((cell, idx) => {
+                        const chave = colunas[idx] || `col_${idx}`;
+                        let valor = cell ? (cell.f !== undefined ? cell.f : cell.v) : '';
+                        obj[chave] = valor;
+                    });
+                    linhasObjetos.push(obj);
+                }
 
-                        inicializarFiltros();
-                        atualizarDashboard();
-                    },
-                    error: function(err) {
-                        txtStatus.innerHTML = `<span class='text-rose-400'>Erro no CSV:</span> ${err.message}`;
-                    }
-                });
-            } catch (err) {
-                txtStatus.innerHTML = `<span class='text-rose-400 font-semibold'>Erro de conexão:</span> verifique o acesso à internet.`;
-                console.error("Erro detalhado:", err);
+                const dadosProcessados = linhasObjetos
+                    .map(linha => adaptarLinhaDaPlanilha(linha))
+                    .filter(d => d.campanha && d.campanha !== '');
+
+                if (dadosProcessados.length > 0) {
+                    dadosBrutos = dadosProcessados;
+                    const agora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                    document.getElementById("txtStatus").innerHTML = `<span class="text-emerald-400 font-semibold">Atualizado às ${agora}</span> (${dadosBrutos.length} campanhas)`;
+                    inicializarFiltros();
+                    atualizarDashboard();
+                } else {
+                    document.getElementById("txtStatus").innerHTML = "<span class='text-amber-400'>Nenhuma campanha encontrada.</span>";
+                }
+            } catch (e) {
+                console.error("Erro no parsing JSONP:", e);
+                document.getElementById("txtStatus").innerHTML = "<span class='text-rose-400'>Erro ao processar dados.</span>";
             }
+        };
+
+        // Carrega via injeção dinâmica de tag script (Bypass de CORS automático)
+        function carregarDadosPlanilhaOnline() {
+            const scriptAntigo = document.getElementById("scriptGvizPlanilha");
+            if (scriptAntigo) scriptAntigo.remove();
+
+            const script = document.createElement("script");
+            script.id = "scriptGvizPlanilha";
+            // Adiciona timestamp para não pegar cache
+            script.src = `https://docs.google.com/spreadsheets/d/e/${DOC_ID}/gviz/tq?tqx=responseHandler:receberDadosPlanilha&gid=${GID}&_t=${Date.now()}`;
+            
+            script.onerror = function() {
+                document.getElementById("txtStatus").innerHTML = "<span class='text-rose-400 font-semibold'>Erro de rede:</span> não foi possível acessar a planilha.";
+            };
+
+            document.body.appendChild(script);
         }
 
         // =========================================================================
@@ -514,9 +513,12 @@
             });
         }
 
+        // =========================================================================
+        // INICIALIZAÇÃO E AUTO-ATUALIZAÇÃO EM SEGUNDO PLANO
+        // =========================================================================
         window.onload = function() {
             carregarDadosPlanilhaOnline();
-            // Atualização contínua e transparente a cada 5 minutos
+            // Reconsulta e sincroniza automaticamente a cada 5 minutos
             setInterval(carregarDadosPlanilhaOnline, 300000);
         };
     </script>
