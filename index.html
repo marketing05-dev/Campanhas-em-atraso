@@ -28,13 +28,13 @@
                     <span class="text-xs font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
                         <i class="fa-solid fa-cloud text-emerald-400"></i> Planilha Online
                     </span>
-                    <span id="indicadorStatus" class="flex h-2.5 w-2.5 relative" title="Conexão">
+                    <span id="indicadorStatus" class="flex h-2.5 w-2.5 relative" title="Conexão Ativa">
                         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                         <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                     </span>
                 </div>
                 <p id="txtStatus" class="text-[11px] text-slate-400 leading-tight">
-                    Conectando à planilha...
+                    Conectando à base...
                 </p>
             </div>
 
@@ -168,9 +168,9 @@
 
     <script>
         // =========================================================================
-        // LINK DA SUA PLANILHA PUBLICADA
+        // LINK DIRETO DA SUA PLANILHA (ABA ESPECÍFICA)
         // =========================================================================
-        const LINK_PLANILHA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQDo50mdiyebTLtKTKDNu6U4LkqspyNyVGHqBejfzL5PHaFRhwPOwjh7xG_HZAsiw/pub?output=csv";
+        const LINK_PLANILHA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQDo50mdiyebTLtKTKDNu6U4LkqspyNyVGHqBejfzL5PHaFRhwPOwjh7xG_HZAsiw/pub?gid=1994805956&single=true&output=csv";
 
         let dadosBrutos = [];
         let chartCompradoresInstance = null;
@@ -187,7 +187,7 @@
             return String(txt || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
         }
 
-        // Dedução automática de fornecedor caso a coluna não venha explicitada
+        // Dedução automática de fornecedor caso a coluna venha vazia ou ausente
         function inferirFornecedorDoNome(nomeCampanha) {
             if (!nomeCampanha) return "-";
             let s = nomeCampanha.trim();
@@ -196,7 +196,7 @@
             return token.length >= 2 ? token : s.split(/\s+/)[0].toUpperCase();
         }
 
-        // Normalização flexível de meses
+        // Padronização dos meses
         function normalizarMes(valorMes) {
             if (!valorMes) return "NÃO INFORMADO";
             const valStr = String(valorMes).trim();
@@ -217,7 +217,7 @@
             return valStr.toUpperCase();
         }
 
-        // Mapeia inteligentemente qualquer variação de nome de coluna
+        // Reconhecimento flexível de colunas
         function adaptarLinhaDaPlanilha(linha) {
             const chaves = Object.keys(linha);
 
@@ -261,7 +261,7 @@
         }
 
         // =========================================================================
-        // REQUISIÇÃO RESILIENTE COM BYPASS DE CORS (MULTILAYER)
+        // BUSCADOR RESILIENTE MULTI-ROTA (RESOLVE O ERRO DE CORS / PROGRESS EVENT)
         // =========================================================================
         async function obterCsvPlanilha(urlAlvo) {
             // Rota 1: Fetch direto
@@ -272,12 +272,12 @@
                     if (txt && (txt.includes(',') || txt.includes(';'))) return txt;
                 }
             } catch (e) {
-                console.warn("Rota direta impedida por segurança do navegador (CORS). Tentando rota 2...");
+                console.warn("Rota direta bloqueada pelo navegador (CORS). Tentando rota 2...");
             }
 
-            // Rota 2: Proxy CORS AllOrigins
+            // Rota 2: Proxy AllOrigins
             try {
-                const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(urlAlvo)}&timestamp=${Date.now()}`;
+                const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(urlAlvo)}&t=${Date.now()}`;
                 const resp = await fetch(proxyUrl);
                 if (resp.ok) {
                     const txt = await resp.text();
@@ -296,10 +296,10 @@
                     if (txt && (txt.includes(',') || txt.includes(';'))) return txt;
                 }
             } catch (e) {
-                console.warn("Todas as rotas de busca online foram esgotadas.");
+                console.warn("Rota 3 falhou.");
             }
 
-            throw new Error("Não foi possível carregar o CSV. Verifique a conexão com a internet.");
+            throw new Error("Não foi possível carregar a planilha online.");
         }
 
         async function carregarDadosPlanilhaOnline() {
@@ -339,7 +339,7 @@
                     }
                 });
             } catch (err) {
-                txtStatus.innerHTML = `<span class='text-rose-400 font-semibold'>Erro de leitura:</span> verifique a conexão.`;
+                txtStatus.innerHTML = `<span class='text-rose-400 font-semibold'>Erro de leitura:</span> verifique conexão.`;
                 console.error(err);
             }
         }
@@ -529,11 +529,11 @@
         }
 
         // =========================================================================
-        // INICIALIZAÇÃO
+        // INICIALIZAÇÃO E AUTO-ATUALIZAÇÃO EM SEGUNDO PLANO
         // =========================================================================
         window.onload = function() {
             carregarDadosPlanilhaOnline();
-            // Reconsulta e sincroniza automaticamente a cada 5 minutos
+            // Reconsulta automaticamente a cada 5 minutos
             setInterval(carregarDadosPlanilhaOnline, 300000);
         };
     </script>
